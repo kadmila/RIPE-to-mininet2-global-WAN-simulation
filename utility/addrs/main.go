@@ -50,7 +50,6 @@ func main() {
 		addr := netip.AddrFrom4(bytes)
 		fmt.Printf("%s\n", addr.String())
 	}
-	fmt.Printf("Dictionary has %d unique address.\n", len(dictionary))
 }
 
 func processFile(filename string, dictionary map[uint32]bool) error {
