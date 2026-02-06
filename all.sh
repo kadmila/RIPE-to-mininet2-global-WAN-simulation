@@ -17,4 +17,14 @@ get_files() {
 }
 
 # Call the function with parameters
-get_files "01" "06"
+# get_files "01" "06"
+
+for i in {106..131}
+do
+    get_files "01" "${i:1:2}"
+done
+
+for i in {101..105}
+do
+    get_files "02" "${i:1:2}"
+done
