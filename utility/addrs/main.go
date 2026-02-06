@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"net/netip"
 	"os"
 	"path/filepath"
 )
@@ -43,6 +44,12 @@ func main() {
 		}
 	}
 
+	for address, _ := range dictionary {
+		var bytes [4]byte
+		binary.NativeEndian.PutUint32(bytes[:], address)
+		addr := netip.AddrFrom4(bytes)
+		fmt.Printf("%s\n", addr.String())
+	}
 	fmt.Printf("Dictionary has %d unique address.\n", len(dictionary))
 }
 
