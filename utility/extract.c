@@ -10,6 +10,10 @@
 static const char str_dst_addr[] = "\"dst_addr\":\"";
 static const size_t len_dst_addr = sizeof(str_dst_addr) - 1;
 
+// "src_addr":"
+static const char str_src_addr[] = "\"src_addr\":\"";
+static const size_t len_src_addr = sizeof(str_src_addr) - 1;
+
 // "result":[
 static const char str_result[] = "\"result\":[";
 static const size_t len_result = sizeof(str_result) - 1;
@@ -22,7 +26,7 @@ static const size_t len_rtt = sizeof(str_rtt) - 1;
 static const char str_prb_id[] = "\"prb_id\":";
 static const size_t len_prb_id = sizeof(str_prb_id) - 1;
 
-static inline int iter_search(char* line, const char* target, int target_len, char stop, char** next_out) {
+static inline int iter_search(char* line, const char* target, int target_len, char stop, char **next_out) {
     char* p = line;
     while (1) {
         if (*p == 0 || *p == stop) return -1;
@@ -34,7 +38,7 @@ static inline int iter_search(char* line, const char* target, int target_len, ch
     }
 }
 
-static inline int iter_search_single(char* line, char target, char stop, char** next_out) {
+static inline int iter_search_single(char* line, char target, char stop, char **next_out) {
     char* p = line;
     while (1) {
         if (*p == 0 || *p == stop) return -1;
@@ -46,7 +50,12 @@ static inline int iter_search_single(char* line, char target, char stop, char** 
     }
 }
 
-static inline int extract_all(char* line, char** dst_addr_1, char** dst_addr_2, char** dst_addr_3, char** dst_addr_4, char **rtt1, char **rtt2, char **rtt3, char** prb_id) {
+static inline int extract_all(
+    char *line,
+    char **dst_addr_1, char **dst_addr_2, char **dst_addr_3, char **dst_addr_4,
+    char **src_addr_1, char **src_addr_2, char **src_addr_3, char **src_addr_4,
+    char **rtt1, char **rtt2, char **rtt3
+) {
     char* p = line;
 
     if (iter_search(p, str_dst_addr, len_dst_addr, 0, &p)) return -1;
@@ -60,6 +69,20 @@ static inline int extract_all(char* line, char** dst_addr_1, char** dst_addr_2, 
     if (iter_search_single(p, '.', '"', &p)) return -1;
     p[-1] = 0;
     *dst_addr_4 = p;
+    if (iter_search_single(p, '"', 0, &p)) return -1;
+    p[-1] = 0;
+    
+    if (iter_search(p, str_src_addr, len_src_addr, 0, &p)) return -1;
+    *src_addr_1 = p;
+    if (iter_search_single(p, '.', '"', &p)) return -1;
+    p[-1] = 0;
+    *src_addr_2 = p;
+    if (iter_search_single(p, '.', '"', &p)) return -1;
+    p[-1] = 0;
+    *src_addr_3 = p;
+    if (iter_search_single(p, '.', '"', &p)) return -1;
+    p[-1] = 0;
+    *src_addr_4 = p;
     if (iter_search_single(p, '"', 0, &p)) return -1;
     p[-1] = 0;
 
@@ -77,57 +100,69 @@ static inline int extract_all(char* line, char** dst_addr_1, char** dst_addr_2, 
     if (iter_search_single(p, '}', ',', &p)) return -1;
     p[-1] = 0;
 
-    if (iter_search(p, str_prb_id, len_prb_id, 0, &p)) return -1;
-    *prb_id = p;
-    if (iter_search_single(p, ',', '"', &p)) return -1;
-    p[-1] = 0;
-
     return 0;
 }
 
 struct pingdata_s
 {
-    uint32_t prb_id;
-    uint8_t ip1, ip2, ip3, ip4;
     float rtt1, rtt2, rtt3;
+    uint8_t dst_addr_1, dst_addr_2, dst_addr_3, dst_addr_4;
+    uint8_t src_addr_1, src_addr_2, src_addr_3, src_addr_4;
 };
 
-static inline int parse_pingdata(struct pingdata_s *dst, const char *dst_addr_1, const char *dst_addr_2, const char *dst_addr_3, const char *dst_addr_4, const char *rtt1, const char *rtt2, const char *rtt3, const char *prb_id) {
+static inline int parse_pingdata(
+    struct pingdata_s *target, 
+    const char *dst_addr_1, const char *dst_addr_2, const char *dst_addr_3, const char *dst_addr_4, 
+    const char *src_addr_1, const char *src_addr_2, const char *src_addr_3, const char *src_addr_4, 
+    const char *rtt1, const char *rtt2, const char *rtt3
+) {
     char *endptr;
     long v_l;
     float v_f;
     
     v_l = strtol(dst_addr_1, &endptr, 10);
     if (endptr == dst_addr_1 || *endptr != 0 || v_l < 0 || v_l > 255) return -1;
-    dst->ip1 = (uint8_t)v_l;
+    target->dst_addr_1 = (uint8_t)v_l;
     
     v_l = strtol(dst_addr_2, &endptr, 10);
     if (endptr == dst_addr_2 || *endptr != 0 || v_l < 0 || v_l > 255) return -1;
-    dst->ip2 = (uint8_t)v_l;
+    target->dst_addr_2 = (uint8_t)v_l;
     
     v_l = strtol(dst_addr_3, &endptr, 10);
     if (endptr == dst_addr_3 || *endptr != 0 || v_l < 0 || v_l > 255) return -1;
-    dst->ip3 = (uint8_t)v_l;
+    target->dst_addr_3 = (uint8_t)v_l;
     
     v_l = strtol(dst_addr_4, &endptr, 10);
     if (endptr == dst_addr_4 || *endptr != 0 || v_l < 0 || v_l > 255) return -1;
-    dst->ip4 = (uint8_t)v_l;
+    target->dst_addr_4 = (uint8_t)v_l;
+    
+    v_l = strtol(src_addr_1, &endptr, 10);
+    if (endptr == src_addr_1 || *endptr != 0 || v_l < 0 || v_l > 255) return -1;
+    target->src_addr_1 = (uint8_t)v_l;
+    
+    v_l = strtol(src_addr_2, &endptr, 10);
+    if (endptr == src_addr_2 || *endptr != 0 || v_l < 0 || v_l > 255) return -1;
+    target->src_addr_2 = (uint8_t)v_l;
+    
+    v_l = strtol(src_addr_3, &endptr, 10);
+    if (endptr == src_addr_3 || *endptr != 0 || v_l < 0 || v_l > 255) return -1;
+    target->src_addr_3 = (uint8_t)v_l;
+    
+    v_l = strtol(src_addr_4, &endptr, 10);
+    if (endptr == src_addr_4 || *endptr != 0 || v_l < 0 || v_l > 255) return -1;
+    target->src_addr_4 = (uint8_t)v_l;
 
     v_f = strtof(rtt1, &endptr);
     if (endptr == rtt1 || *endptr != 0 || v_f < 0.0f) return -1;
-    dst->rtt1 = v_f;
+    target->rtt1 = v_f;
 
     v_f = strtof(rtt2, &endptr);
     if (endptr == rtt2 || *endptr != 0 || v_f < 0.0f) return -1;
-    dst->rtt2 = v_f;
+    target->rtt2 = v_f;
 
     v_f = strtof(rtt3, &endptr);
     if (endptr == rtt3 || *endptr != 0 || v_f < 0.0f) return -1;
-    dst->rtt3 = v_f;
-
-    v_l = strtol(prb_id, &endptr, 10);
-    if (endptr == prb_id || *endptr != 0 || v_l < 0) return -1;
-    dst->prb_id = v_l;
+    target->rtt3 = v_f;
 
     return 0;
 }
@@ -155,18 +190,28 @@ int main(int argc, char* argv[]) {
     
     char line[MAX_LINE_SIZE+1];
     line[MAX_LINE_SIZE] = 0;
-    char *dst_addr_1, *dst_addr_2, *dst_addr_3, *dst_addr_4, *rtt1, *rtt2, *rtt3, *prb_id;
+    char *dst_addr_1, *dst_addr_2, *dst_addr_3, *dst_addr_4, *src_addr_1, *src_addr_2, *src_addr_3, *src_addr_4, *rtt1, *rtt2, *rtt3;
     struct pingdata_s pingdata;
     
-    char *dump; //strtoul ignore
-
     while (fgets(line, MAX_LINE_SIZE, stdin)) {
         //printf("%s", line);
 
-        if (extract_all(line, &dst_addr_1, &dst_addr_2, &dst_addr_3, &dst_addr_4, &rtt1, &rtt2, &rtt3, &prb_id)) continue;
-        if (parse_pingdata(&pingdata, dst_addr_1, dst_addr_2, dst_addr_3, dst_addr_4, rtt1, rtt2, rtt3, prb_id)) continue;
+        if (extract_all(
+            line, 
+            &dst_addr_1, &dst_addr_2, &dst_addr_3, &dst_addr_4, 
+            &src_addr_1, &src_addr_2, &src_addr_3, &src_addr_4, 
+            &rtt1, &rtt2, &rtt3)) continue;
 
-        //printf(">>>>>%d.%d.%d.%d|%d|%f|%f|%f\n\n", pingdata.ip1, pingdata.ip2, pingdata.ip3, pingdata.ip4, pingdata.prb_id, pingdata.rtt1, pingdata.rtt2, pingdata.rtt3);
+        if (parse_pingdata(
+            &pingdata, 
+            dst_addr_1, dst_addr_2, dst_addr_3, dst_addr_4, 
+            src_addr_1, src_addr_2, src_addr_3, src_addr_4, 
+            rtt1, rtt2, rtt3)) continue;
+
+        // printf(">>>>>%d.%d.%d.%d|%d.%d.%d.%d|%f|%f|%f\n\n", 
+        //     pingdata.dst_addr_1, pingdata.dst_addr_2, pingdata.dst_addr_3, pingdata.dst_addr_4, 
+        //     pingdata.src_addr_1, pingdata.src_addr_2, pingdata.src_addr_3, pingdata.src_addr_4, 
+        //     pingdata.rtt1, pingdata.rtt2, pingdata.rtt3);
         fwrite(&pingdata, sizeof(struct pingdata_s), 1, wfp);
     }
     

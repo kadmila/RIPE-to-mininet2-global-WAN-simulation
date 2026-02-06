@@ -21,10 +21,10 @@ int main(int argc, char* argv[]) {
     fp = fopen(argv[1], "rb");
     fread(buf, sizeof(struct pingdata_s), 10, fp);
 
-    struct pingdata_s *pingdata;
+    struct pingdata_s pingdata;
 
     for (int i = 0; i < 10; i++) {
-        pingdata = &buf[i];
-        printf("%d.%d.%d.%d|%d|%f|%f|%f\n", pingdata->ip1, pingdata->ip2, pingdata->ip3, pingdata->ip4, pingdata->prb_id, pingdata->rtt1, pingdata->rtt2, pingdata->rtt3);
+        pingdata = buf[i];
+        printf("%d.%d.%d.%d|%d|%f|%f|%f\n", pingdata.ip1, pingdata.ip2, pingdata.ip3, pingdata.ip4, pingdata.prb_id, pingdata.rtt1, pingdata.rtt2, pingdata.rtt3);
     }
 }
