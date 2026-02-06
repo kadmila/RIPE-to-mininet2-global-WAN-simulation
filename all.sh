@@ -6,7 +6,7 @@ get_files() {
     local month=$1
     local day=$2
     
-    for ((i=10000; i<=10000; i+=100)); do
+    for ((i=10000; i<=12300; i+=100)); do
         local time="${i:1:4}"
         local date="2026-${month}-${day}"
         local fileName="ping-${date}T${time}.bz2"
