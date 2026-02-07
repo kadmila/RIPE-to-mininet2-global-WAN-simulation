@@ -54,5 +54,6 @@ dkms.conf
 *.dwo
 
 # my files
-/data
+/anchors
 /bin
+/data
