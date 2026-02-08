@@ -57,3 +57,5 @@ dkms.conf
 /anchors
 /bin
 /data
+
+*.venv/
