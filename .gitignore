@@ -57,5 +57,11 @@ dkms.conf
 /anchors
 /bin
 /data
+/mininet
+*code-workspace
+/oflops
+/openflow
+/oftest
+/pox
 
 *.venv/
