@@ -26,7 +26,7 @@ from mininet.log import setLogLevel
 # ------------------------------------------------------------------
 
 CONFIG_PATH = './city_config.json'
-DEFAULT_BANDWIDTH = 10000  # 10 Gbps
+DEFAULT_BANDWIDTH = 1000  # 1 Gbps
 
 # Network emulation parameters for realistic WAN simulation
 JITTER_DISTRIBUTION = 'normal'  # Use normal distribution for realistic WAN jitter
@@ -117,14 +117,14 @@ class GlobalWANTopo(Topo):
                     self.switchs[city1],
                     self.switchs[city2],
                     cls=TCLink,
-                    delay=f'{delay_ms:.2f}ms {jitter_ms:.2f}ms {DELAY_CORRELATION}% distribution {JITTER_DISTRIBUTION}',
+                    delay=f'{delay_ms:.2f}ms',
+                    jitter=f'{jitter_ms:.2f}ms',
                     bw=DEFAULT_BANDWIDTH
                 )
                 
                 link_count += 1
                 print(f'  Link {link_count}: {city1} <-> {city2} '
-                      f'(delay: {delay_ms:.2f}ms ± {jitter_ms:.2f}ms, '
-                      f'corr: {DELAY_CORRELATION}%, dist: {JITTER_DISTRIBUTION})')
+                      f'(delay: {delay_ms:.2f}ms ± {jitter_ms:.2f}ms (stddev) )')
         
         print(f'\nTopology built: {len(self.switchs)} switchs, {link_count} links')
 
