@@ -2,6 +2,7 @@
 import os
 import random
 import json
+import numpy as np
 from math import radians, cos, sin, sqrt, atan2
 
 module_path = os.path.abspath('../mininet')
@@ -25,8 +26,11 @@ with open('./city_config.json') as f_city_config:
 # light speed in glass fiber is ~2/3 of c
 SPEED_COEFFICIENT=0.66
 
+# fiber cable distance multiplier to line-of-sight distance
+DISTANCE_COEFFICIENT=1.5
+
 # ------------------------------------------------------------------
-# 1. CLI arguments
+# 1. CLI Arguments
 # ------------------------------------------------------------------
 parser = argparse.ArgumentParser(
     prog='sudo python3 main.py',
@@ -34,6 +38,7 @@ parser = argparse.ArgumentParser(
     epilog='')
 
 parser.add_argument('--n_peer', required=True, type=int, help='Total of peers')
+parser.add_argument('--seed', required=True, type=int, help='Random seed for deterministic simulation')
 
 args = parser.parse_args()
 print(f"{vars(args)}") # refer to when reading logs later
@@ -42,6 +47,59 @@ if (args.n_peer > 1000 | args.n_peer < 1):
     print("max n_peer is 1000")
     exit(1)
 
+random.seed(args.seed)
+
+# ------------------------------------------------------------------
+# 2. Peer Distribution
+# ------------------------------------------------------------------
+def sample_peer_distance(city_radius, mean_radius_ratio=0.3):
+    """
+    Sample a peer's distance from the city center assuming
+    a radially symmetric city with exponentially decaying population density.
+
+    Parameters
+    ----------
+    city_radius : float
+        Radius of the city.
+    mean_radius_ratio : float, optional
+        Mean distance as a fraction of city radius (default: 0.3).
+
+    Returns
+    -------
+    float
+        Distance from city center.
+    """
+    mean_radius = mean_radius_ratio * city_radius
+    lam = 2 / mean_radius  # decay rate for 2D exponential density
+
+    # Gamma(k=2, theta=1/lam)
+    r = np.random.gamma(shape=2, scale=1/lam)
+
+    return min(r, city_radius)
+
+def latency_ms(distance_km):
+    """Calculate one-way latency in milliseconds for a given distance in kilometers."""
+    return ((distance_km * DISTANCE_COEFFICIENT) / (299_792.458 * SPEED_COEFFICIENT)) * 1000
+
+def weighted_peer_sample():
+    names = list(city_config.keys())
+    weights = [v['population'] for v in city_config.values()]
+    locations = random.choices(names, weights=weights, k=args.n_peer)
+
+    result = []
+    for loc in locations:
+        rad = city_config[loc]['radius']
+        distance = sample_peer_distance(rad)
+
+        result.append((loc, latency_ms(distance)))
+    
+    return result
+
+peers_location_latency = weighted_peer_sample()
+print(f"peer locations: {peers_location_latency}")
+
+exit(0)
+
 # ------------------------------------------------------------------
 # Mininet Construction
 # ------------------------------------------------------------------
@@ -49,14 +107,16 @@ if (args.n_peer > 1000 | args.n_peer < 1):
 class NetworkTopo( Topo ):
     def build(self):
         # regional router, switch, and hosts
-        for region, (_, _, ip_prefix) in REGIONS.items():
+        for region, region_info in city_config.items():
+            ip_prefix = region_info['ip_prefix']
+
             # router to switch
             router = self.addHost(f'r_{region}')
             switch = self.addSwitch(f's_{region}', dpid=f'00000000000000{ip_prefix}')
             self.addLink( switch, router, intfName2=f'r-{region}-eth0' ) # random ip will be assigned to this interface. (mininet limitation of a Node)
 
             # switch to hosts
-            for i in range(args.n_client):
+            for i in range(args.n_peer):
                 host = self.addHost( f'h_{region}_{i}', ip=f'{ip_prefix}.0.1.{i+1}/8',
                                     defaultRoute=f'via {ip_prefix}.0.0.1' )
                 self.addLink( switch, host, intfName2=f'h-eth0', delay=f'{random.uniform(0.0, 2.0)}ms' ) # mini suburban delay
@@ -120,14 +180,14 @@ if __name__ == '__main__':
 
     # run server and take log
     print("running server")
-    server_host.cmd(f'./server.sh 0.0.0.0:3000 {args.n_client * len(REGION_NAMES) - 1} > server_log.txt 2> server_err.txt &')
+    server_host.cmd(f'./server.sh 0.0.0.0:3000 {args.n_peer * len(REGION_NAMES) - 1} > server_log.txt 2> server_err.txt &')
 
     server_addr = f'{REGIONS[args.server_region][2]}.0.1.1:3000'
 
     # run clients
     print("running clients")
     for region, (_, _, ip_prefix) in REGIONS.items():
-        for i in range(args.n_client):
+        for i in range(args.n_peer):
             if region == args.server_region and i == 0:
                 continue
 
@@ -144,7 +204,7 @@ if __name__ == '__main__':
     
     # clear clients
     for region, (_, _, ip_prefix) in REGIONS.items():
-        for i in range(args.n_client):
+        for i in range(args.n_peer):
             if region == args.server_region and i == 0:
                 continue
 
