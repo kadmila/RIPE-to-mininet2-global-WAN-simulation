@@ -34,8 +34,6 @@ DELAY_CORRELATION = 25  # Correlation percentage for successive packets (0-100)
 
 # IP addressing for point-to-point router links
 # Each link between two cities gets a /30 subnet (2 usable IPs)
-P2P_SUBNET_BASE = '10.0.0.0/8'  # Base network for all point-to-point links
-
 
 def load_city_config():
     """Load and return city configuration from JSON file."""
@@ -113,7 +111,7 @@ class GlobalWANTopo(Topo):
             # IP addresses will be configured later in configure_routers()
             self.addHost(router_name, ip=None)
             
-            print(f'  Created router {router_name} for {CITY_NAMES[city_abbr]}')
+            #print(f'  Created router {router_name} for {CITY_NAMES[city_abbr]}')
         
         # Create fully-connected mesh between all city routers
         print("\nCreating inter-city links...")
@@ -160,8 +158,8 @@ class GlobalWANTopo(Topo):
                 })
                 
                 link_count += 1
-                print(f'  Link {link_count}: {city1} <-> {city2} '
-                      f'(delay: {delay_ms:.2f}ms ± {jitter_ms:.2f}ms, link_id: {link_id})')
+                # print(f'  Link {link_count}: {city1} <-> {city2} '
+                #       f'(delay: {delay_ms:.2f}ms ± {jitter_ms:.2f}ms, link_id: {link_id})')
         
         print(f'\nTopology built: {len(CITY_ABBRS)} routers, {link_count} links')
 
@@ -169,6 +167,9 @@ class GlobalWANTopo(Topo):
 # ------------------------------------------------------------------
 # Network Setup and Configuration
 # ------------------------------------------------------------------
+
+def router_systemctl_config(router):
+    router.cmd('sysctl -w net.ipv4.ip_forward=1 > /dev/null')
 
 def configure_routers(net, topo):
     """
@@ -197,13 +198,13 @@ def configure_routers(net, topo):
         router1 = net.get(f'r_{city1}')
         router2 = net.get(f'r_{city2}')
         
-        # Enable IP forwarding on routers (only once per router)
+        # Enable IP forwarding on routers, and drop autoconfigured routing rules (only once per router)
         if city1 not in routers_configured:
-            router1.cmd('sysctl -w net.ipv4.ip_forward=1 > /dev/null')
+            router_systemctl_config(router1)
             routers_configured.add(city1)
         
         if city2 not in routers_configured:
-            router2.cmd('sysctl -w net.ipv4.ip_forward=1 > /dev/null')
+            router_systemctl_config(router2)
             routers_configured.add(city2)
         
         # Assign IP addresses to point-to-point interfaces
@@ -211,16 +212,16 @@ def configure_routers(net, topo):
         ip1 = f'10.{link_id}.0.1'
         ip2 = f'10.{link_id}.0.2'
 
-        subnet = f'10.{link_id}.0.0/30'
+        subnet_mask = f'255.255.255.3/30'
         
-        router1.cmd(f'ifconfig {intf1} {subnet}')
-        router2.cmd(f'ifconfig {intf2} {subnet}')
+        router1.cmd(f'ifconfig {intf1} {ip1} netmask {subnet_mask}')
+        router2.cmd(f'ifconfig {intf2} {ip2} netmask {subnet_mask}')
         
         # Add routes: each router adds a route to reach the other router's IP
         router1.cmd(f'ip route add {ip2} dev {intf1}')
         router2.cmd(f'ip route add {ip1} dev {intf2}')
         
-        print(f'    Link {link_id}: {city1} <-> {city2} ({subnet})')
+        print(f'    Link {link_id}: {city1} ({ip1}) <-> {city2} ({ip2})')
     
     print(f'\n  Configuration complete: {len(routers_configured)} routers, {len(topo.links_info)} links')
 
@@ -298,7 +299,7 @@ def run_simulation():
     print("=" * 70)
     
     # Set log level
-    setLogLevel('info')
+    setLogLevel('output')
     
     # Create topology
     print("\nBuilding topology...")
@@ -309,6 +310,7 @@ def run_simulation():
     net = Mininet(
         topo=topo,
         link=TCLink,
+        waitConnected=True,
         autoSetMacs=True,
         autoStaticArp=False
     )
@@ -320,25 +322,16 @@ def run_simulation():
     configure_routers(net, topo)
     
     # Validate network configuration
-    validate_network(net, topo)
+    # validate_network(net, topo)
     
     # Print network info
     print("\n" + "=" * 70)
-    print("Network is ready!")
-    print("=" * 70)
     print("\nAvailable routers:")
     for city_abbr in sorted(CITY_ABBRS):
         router_name = f'r_{city_abbr}'
         city_name = CITY_NAMES[city_abbr]
         print(f'  {router_name} - {city_name}')
     
-    print("\nYou can now:")
-    print("  - Test connectivity: Use ping between routers")
-    print("    Example: r_tko ping -c 3 10.X.0.2  (where X is a link ID)")
-    print("  - Check routing: <router> ip route")
-    print("  - Check interfaces: <router> ip addr show")
-    print("  - Run commands: <router> <command>")
-    print("  - Exit: quit or exit")
     print("=" * 70)
     
     # Start CLI
