@@ -232,7 +232,47 @@ class GlobalWANTopo(Topo):
         # ----------------------------------------------------------
         # Peer Placement
         # ----------------------------------------------------------
-
+        
+        # Store peer metadata for configuration
+        self.peers_info = []
+        
+        if len(PEER_CONFIG) > 0:
+            print(f"\nCreating {len(PEER_CONFIG)} peer hosts...")
+            
+            for peer_idx, (city_abbr, distance) in enumerate(PEER_CONFIG):
+                peer_number = peer_idx + 1
+                peer_name = f'h{peer_number}'
+                switch_name = f's_{city_abbr}'
+                
+                # Calculate IP address: 20.{city_number}.{hi}.{lo}
+                city_number = CITY_NUMBERS[city_abbr]
+                hi_byte = (peer_number // 250) + 1  # High byte
+                lo_byte = (peer_number % 250) + 1  # Low byte
+                peer_ip = f'20.{city_number}.{hi_byte}.{lo_byte}'
+                gateway_ip = f'20.{city_number}.1.1'
+                
+                # Add peer host with IP address
+                self.addHost(
+                    peer_name,
+                    ip=f'{peer_ip}/16',
+                    defaultRoute=f'via {gateway_ip}'
+                )
+                
+                # Connect peer to city switch
+                self.addLink(peer_name, switch_name)
+                
+                # Store peer metadata
+                self.peers_info.append({
+                    'peer_name': peer_name,
+                    'peer_number': peer_number,
+                    'city_abbr': city_abbr,
+                    'city_number': city_number,
+                    'distance': distance,
+                    'ip': peer_ip,
+                    'gateway': gateway_ip
+                })
+            
+            print(f'  Created {len(PEER_CONFIG)} peers across {len(set(p[0] for p in PEER_CONFIG))} cities')
 
 # ------------------------------------------------------------------
 # Network Setup and Configuration
@@ -253,11 +293,13 @@ def router_internal_config(router, city_abbr):
     # Peer network: 20.{city_number}.0.0/16
     # Router gets 20.{city_number}.0.1/16 as gateway
     city_number = CITY_NUMBERS[city_abbr]
-    switch_intf = f'r-{city_abbr}-sw'
-    switch_ip = f'20.{city_number}.0.1'
+    router_to_switch_intf = f'r-{city_abbr}-sw'
+    router_to_switch_ip = f'20.{city_number}.1.1'
+    router_inbound_range = f'20.{city_number}.0.0/16'
     
     # Assign IP address to switch interface
-    router.cmd(f'ifconfig {switch_intf} {switch_ip} netmask 255.255.0.0')
+    router.cmd(f'ifconfig {router_to_switch_intf} {router_to_switch_ip} netmask 255.255.0.0')
+    router.cmd(f'ip route add {router_inbound_range} dev {router_to_switch_intf}')
 
 def configure_routers(net, topo):
     """
