@@ -102,6 +102,7 @@ def preprocess_city_links(city_config):
 CITY_CONFIG = load_city_config()
 CITY_ABBRS = list(CITY_CONFIG.keys())  # List of city abbreviations
 CITY_NAMES = {abbr: data['city'] for abbr, data in CITY_CONFIG.items()}  # Map abbr -> full city name
+CITY_NUMBERS = {abbr: idx + 1 for idx, abbr in enumerate(CITY_ABBRS)}  # Map abbr -> city number (1-based)
 LINK_ID_MAP = preprocess_city_links(CITY_CONFIG)
 
 
@@ -159,16 +160,24 @@ class GlobalWANTopo(Topo):
         # Store link metadata for routing configuration
         self.links_info = []
         
-        # Create a router for each city
-        print("Creating city routers...")
+        # Create a router and switch for each city
+        print("Creating city routers and switches...")
         for city_abbr in CITY_ABBRS:
-            router_name = f'r_{city_abbr}'
-            
             # Add host node that will act as a router
             # IP addresses will be configured later in configure_routers()
-            self.addHost(router_name, ip=None)
+            self.addHost(f'r_{city_abbr}', ip=None)
             
-            #print(f'  Created router {router_name} for {CITY_NAMES[city_abbr]}')
+            # Add switch for this city
+            self.addSwitch(f's_{city_abbr}')
+            
+            # Connect router to switch with named interface
+            self.addLink(
+                f'r_{city_abbr}',
+                f's_{city_abbr}',
+                intfName1=f'r-{city_abbr}-sw'
+            )
+            
+            #print(f'  Created router {router_name} and switch {switch_name} for {CITY_NAMES[city_abbr]}')
         
         # Create fully-connected mesh between all city routers
         print("\nCreating inter-city links...")
@@ -218,15 +227,37 @@ class GlobalWANTopo(Topo):
                 # print(f'  Link {link_count}: {city1} <-> {city2} '
                 #       f'(delay: {delay_ms:.2f}ms ± {jitter_ms:.2f}ms, link_id: {link_id})')
         
-        print(f'\nTopology built: {len(CITY_ABBRS)} routers, {link_count} links')
+        print(f'\nTopology built: {len(CITY_ABBRS)} routers, {len(CITY_ABBRS)} switches, {link_count} inter-city links')
+
+        # ----------------------------------------------------------
+        # Peer Placement
+        # ----------------------------------------------------------
 
 
 # ------------------------------------------------------------------
 # Network Setup and Configuration
 # ------------------------------------------------------------------
 
-def router_systemctl_config(router):
+def router_internal_config(router, city_abbr):
+    """
+    Configure router internal settings including IP forwarding and switch interface.
+    
+    Args:
+        router: Mininet router node
+        city_abbr: City abbreviation for this router
+    """
+    # Enable IP forwarding
     router.cmd('sysctl -w net.ipv4.ip_forward=1 > /dev/null')
+    
+    # Configure router-switch interface with peer network IP
+    # Peer network: 20.{city_number}.0.0/16
+    # Router gets 20.{city_number}.0.1/16 as gateway
+    city_number = CITY_NUMBERS[city_abbr]
+    switch_intf = f'r-{city_abbr}-sw'
+    switch_ip = f'20.{city_number}.0.1'
+    
+    # Assign IP address to switch interface
+    router.cmd(f'ifconfig {switch_intf} {switch_ip} netmask 255.255.0.0')
 
 def configure_routers(net, topo):
     """
@@ -255,13 +286,13 @@ def configure_routers(net, topo):
         router1 = net.get(f'r_{city1}')
         router2 = net.get(f'r_{city2}')
         
-        # Enable IP forwarding on routers, and drop autoconfigured routing rules (only once per router)
+        # Configure router internal settings (only once per router)
         if city1 not in routers_configured:
-            router_systemctl_config(router1)
+            router_internal_config(router1, city1)
             routers_configured.add(city1)
         
         if city2 not in routers_configured:
-            router_systemctl_config(router2)
+            router_internal_config(router2, city2)
             routers_configured.add(city2)
         
         # Assign IP addresses to point-to-point interfaces
