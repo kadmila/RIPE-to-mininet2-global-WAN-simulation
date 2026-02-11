@@ -8,6 +8,8 @@ import os
 import sys
 import json
 import math
+import random
+import argparse
 
 # Add mininet to path
 module_path = os.path.abspath('../mininet')
@@ -22,18 +24,38 @@ from mininet.log import setLogLevel
 
 
 # ------------------------------------------------------------------
+# Argument Parsing
+# ------------------------------------------------------------------
+
+parser = argparse.ArgumentParser(
+    description='Global WAN Simulation with RIPE Atlas data'
+)
+parser.add_argument(
+    '--n_peers',
+    type=int,
+    default=0,
+    help='Number of peers to generate (default: 0)'
+)
+parser.add_argument(
+    '--seed',
+    type=int,
+    default=None,
+    help='Random seed for peer placement (default: None)'
+)
+args = parser.parse_args()
+
+# Initialize random seed if provided
+if args.seed is not None:
+    random.seed(args.seed)
+    print(f'Random seed set to: {args.seed}')
+
+
+# ------------------------------------------------------------------
 # Global Configuration
 # ------------------------------------------------------------------
 
 CONFIG_PATH = './city_config.json'
 DEFAULT_BANDWIDTH = 1000  # 1 Gbps
-
-# Network emulation parameters for realistic WAN simulation
-JITTER_DISTRIBUTION = 'normal'  # Use normal distribution for realistic WAN jitter
-DELAY_CORRELATION = 25  # Correlation percentage for successive packets (0-100)
-
-# IP addressing for point-to-point router links
-# Each link between two cities gets a /30 subnet (2 usable IPs)
 
 def load_city_config():
     """Load and return city configuration from JSON file."""
@@ -82,6 +104,41 @@ CITY_ABBRS = list(CITY_CONFIG.keys())  # List of city abbreviations
 CITY_NAMES = {abbr: data['city'] for abbr, data in CITY_CONFIG.items()}  # Map abbr -> full city name
 LINK_ID_MAP = preprocess_city_links(CITY_CONFIG)
 
+
+def generate_peer_placements(n):
+    """
+    Generate N peer placements by selecting cities and distances.
+    
+    Cities are selected with probability proportional to population.
+    Distances are selected uniformly in 2D space within each city's circular area.
+    
+    Args:
+        n: Number of peers to generate
+        
+    Returns:
+        List of tuples (city_abbr: str, distance: float)
+    """
+    populations = [CITY_CONFIG[city]['population'] for city in CITY_ABBRS]
+    total_population = sum(populations)
+    
+    # Calculate probability weights for each city
+    weights = [pop / total_population for pop in populations]
+    
+    placements = []
+    for _ in range(n):
+        # Select city with probability proportional to population
+        city_abbr = random.choices(CITY_ABBRS, weights=weights, k=1)[0]
+        
+        # Select distance uniformly in 2D circular area
+        # For uniform distribution in a circle, distance ~ sqrt(uniform(0,1)) * radius
+        city_radius = CITY_CONFIG[city_abbr]['radius']
+        distance = math.sqrt(random.random()) * city_radius
+        
+        placements.append((city_abbr, distance))
+    
+    return placements
+
+PEER_CONFIG = generate_peer_placements(args.n_peers)
 
 # ------------------------------------------------------------------
 # Topology Class
@@ -344,17 +401,16 @@ def run_simulation():
 
 
 # ------------------------------------------------------------------
-# Main Entry Point
+# Main Execution
 # ------------------------------------------------------------------
 
-if __name__ == '__main__':
-    try:
-        run_simulation()
-    except KeyboardInterrupt:
-        print("\n\nInterrupted by user")
-        sys.exit(0)
-    except Exception as e:
-        print(f"\nError: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+try:
+    run_simulation()
+except KeyboardInterrupt:
+    print("\n\nInterrupted by user")
+    sys.exit(0)
+except Exception as e:
+    print(f"\nError: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
