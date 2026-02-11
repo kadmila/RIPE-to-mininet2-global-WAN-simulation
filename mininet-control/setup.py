@@ -21,6 +21,7 @@ from mininet.net import Mininet
 from mininet.link import TCLink
 from mininet.cli import CLI
 from mininet.log import setLogLevel
+from mininet.node import OVSBridge
 
 
 # ------------------------------------------------------------------
@@ -56,6 +57,7 @@ if args.seed is not None:
 
 CONFIG_PATH = './city_config.json'
 DEFAULT_BANDWIDTH = 1000  # 1 Gbps
+PEER_BANDWIDTH = 250  # 250 Mbps
 
 def load_city_config():
     """Load and return city configuration from JSON file."""
@@ -141,6 +143,11 @@ def generate_peer_placements(n):
 
 PEER_CONFIG = generate_peer_placements(args.n_peers)
 
+REFRACTION_COEFFICIENT = 1.5
+DISTANCE_MULTIPLIER = 1.5
+def distance_to_delay(dist_km:float) -> float :
+    return (dist_km * DISTANCE_MULTIPLIER) / (299_792.458 / REFRACTION_COEFFICIENT) * 1000
+
 # ------------------------------------------------------------------
 # Topology Class
 # ------------------------------------------------------------------
@@ -167,17 +174,16 @@ class GlobalWANTopo(Topo):
             # IP addresses will be configured later in configure_routers()
             self.addHost(f'r_{city_abbr}', ip=None)
             
-            # Add switch for this city
-            self.addSwitch(f's_{city_abbr}')
+            # Add switch for this city 
+            self.addSwitch(f's_{city_abbr}', cls=OVSBridge, dpid=f"{1000 + CITY_NUMBERS[city_abbr]:016x}")
             
             # Connect router to switch with named interface
             self.addLink(
                 f'r_{city_abbr}',
                 f's_{city_abbr}',
-                intfName1=f'r-{city_abbr}-sw'
+                intfName1=f'r_{city_abbr}-s',
+                intfName2=f's_{city_abbr}-r'
             )
-            
-            #print(f'  Created router {router_name} and switch {switch_name} for {CITY_NAMES[city_abbr]}')
         
         # Create fully-connected mesh between all city routers
         print("\nCreating inter-city links...")
@@ -204,8 +210,8 @@ class GlobalWANTopo(Topo):
                 self.addLink(
                     f'r_{city1}',
                     f'r_{city2}',
-                    intfName1=f'r-{city1}-{city2}',
-                    intfName2=f'r-{city2}-{city1}',
+                    intfName1=f'r_{city1}-{city2}',
+                    intfName2=f'r_{city2}-{city1}',
                     cls=TCLink,
                     delay=f'{delay_ms:.2f}ms',
                     jitter=f'{jitter_ms:.2f}ms',
@@ -217,8 +223,8 @@ class GlobalWANTopo(Topo):
                     'city1': city1,
                     'city2': city2,
                     'link_id': link_id,
-                    'intf1': f'r-{city1}-{city2}',
-                    'intf2': f'r-{city2}-{city1}',
+                    'intf1': f'r_{city1}-{city2}',
+                    'intf2': f'r_{city2}-{city1}',
                     'delay_ms': delay_ms,
                     'jitter_ms': jitter_ms
                 })
@@ -241,8 +247,6 @@ class GlobalWANTopo(Topo):
             
             for peer_idx, (city_abbr, distance) in enumerate(PEER_CONFIG):
                 peer_number = peer_idx + 1
-                peer_name = f'h{peer_number}'
-                switch_name = f's_{city_abbr}'
                 
                 # Calculate IP address: 20.{city_number}.{hi}.{lo}
                 city_number = CITY_NUMBERS[city_abbr]
@@ -252,22 +256,32 @@ class GlobalWANTopo(Topo):
                 gateway_ip = f'20.{city_number}.1.1'
                 
                 # Add peer host with IP address
-                self.addHost(
-                    peer_name,
+                peer = self.addHost(
+                    f'h{peer_number}',
                     ip=f'{peer_ip}/16',
                     defaultRoute=f'via {gateway_ip}'
                 )
+
+                delay_ms = distance_to_delay(distance)
                 
                 # Connect peer to city switch
-                self.addLink(peer_name, switch_name)
+                self.addLink(
+                    f'h{peer_number}',
+                    f's_{city_abbr}',
+                    intfName1=f'h_eth1',
+                    intfName2=f's_{city_abbr}-h{peer_number}',
+                    cls=TCLink,
+                    delay=f'{delay_ms:.2f}ms',
+                    bw=PEER_BANDWIDTH
+                )
                 
                 # Store peer metadata
                 self.peers_info.append({
-                    'peer_name': peer_name,
+                    'peer_name': f'h{peer_number}',
                     'peer_number': peer_number,
                     'city_abbr': city_abbr,
                     'city_number': city_number,
-                    'distance': distance,
+                    'delay_ms': delay_ms,
                     'ip': peer_ip,
                     'gateway': gateway_ip
                 })
@@ -293,7 +307,7 @@ def router_internal_config(router, city_abbr):
     # Peer network: 20.{city_number}.0.0/16
     # Router gets 20.{city_number}.0.1/16 as gateway
     city_number = CITY_NUMBERS[city_abbr]
-    router_to_switch_intf = f'r-{city_abbr}-sw'
+    router_to_switch_intf = f'r_{city_abbr}-s'
     router_to_switch_ip = f'20.{city_number}.1.1'
     router_inbound_range = f'20.{city_number}.0.0/16'
     
@@ -429,7 +443,7 @@ def run_simulation():
     print("=" * 70)
     
     # Set log level
-    setLogLevel('output')
+    setLogLevel('info')
     
     # Create topology
     print("\nBuilding topology...")
@@ -440,30 +454,17 @@ def run_simulation():
     net = Mininet(
         topo=topo,
         link=TCLink,
-        waitConnected=True,
+        controller=None,
         autoSetMacs=True,
-        autoStaticArp=False
+        autoStaticArp=True
     )
-    
-    # Start network
-    net.start()
     
     # Configure routers (IP addresses, forwarding, routing tables)
     configure_routers(net, topo)
     
-    # Validate network configuration
-    # validate_network(net, topo)
-    
-    # Print network info
-    print("\n" + "=" * 70)
-    print("\nAvailable routers:")
-    for city_abbr in sorted(CITY_ABBRS):
-        router_name = f'r_{city_abbr}'
-        city_name = CITY_NAMES[city_abbr]
-        print(f'  {router_name} - {city_name}')
-    
-    print("=" * 70)
-    
+    # Start network
+    net.start()
+        
     # Start CLI
     CLI(net)
     
