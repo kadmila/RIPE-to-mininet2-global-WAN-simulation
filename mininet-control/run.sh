@@ -24,4 +24,13 @@ run_seed_range() {
     done
 }
 
-run_experiment 10 0
+run_console() {
+    N_PEERS=$1
+    SEED=$2
+
+    sudo rm -rf ./results/$N_PEERS/$SEED
+    mkdir -p ./results/$N_PEERS/$SEED
+    sudo python3 setup.py --n_peers $N_PEERS --seed $SEED
+}
+
+run_seed_range 10 4

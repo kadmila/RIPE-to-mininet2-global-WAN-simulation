@@ -67,3 +67,7 @@ dkms.conf
 /mininet-control/results
 *.pem
 /mininet-control/dump.log
+
+*/.venv
+
+/mininet-control/plotter/*.jpg

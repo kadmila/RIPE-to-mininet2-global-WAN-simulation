@@ -381,11 +381,22 @@ def configure_routers(net, topo):
 # ------------------------------------------------------------------
 
 def run_peer_applications(net, topo):
+    peers = [(net.get(peer_info['peer_name']), peer_info['peer_name']) for peer_info in topo.peers_info]
+
+    for peer, peer_name in peers:
+        peer.cmd(f'ifstat -i h_eth1 -n > ./results/{args.n_peers}/{args.seed}/ifstat_{peer_name}.log &')
+        
+    target_ip = topo.peers_info[0]['ip']
+    for peer, peer_name in peers:
+        peer.cmd(f'ping -c 5 {target_ip} &')
+        
+        # peer.cmd(f'cd ./results/{args.n_peers}/{args.seed} && echo "Starting peer application for {peer_name}" > {peer_name}.log &')
+
+def stop_peer_applications(net, topo):
     for peer_info in topo.peers_info:
         peer_name = peer_info['peer_name']
-
         peer = net.get(peer_name)
-        peer.cmd(f'cd ./results/{args.n_peers}/{args.seed} && echo "Starting peer application for {peer_name}" > {peer_name}.log &')
+        peer.cmd('pkill ifstat')
 
 def run_simulation():
     """Main function to set up and run the simulation."""
@@ -414,12 +425,18 @@ def run_simulation():
     net.start()
 
     time.sleep(3)
+    print("\nRunning peer applications...")
     run_peer_applications(net, topo)
+    print("Peer applications started.")
         
     # Start CLI
-    # CLI(net)
+    #CLI(net)
     
-    time.sleep(3)
+    time.sleep(10)
+
+    print("\nStopping peer applications...")
+    stop_peer_applications(net, topo)
+    print("Peer applications stopped.")
     
     # Cleanup
     print("\nStopping network...")
