@@ -65,3 +65,4 @@ dkms.conf
 /pox
 
 /mininet-control/results
+/mininet-control/dump.log

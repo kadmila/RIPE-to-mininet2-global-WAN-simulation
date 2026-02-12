@@ -385,7 +385,7 @@ def run_peer_applications(net, topo):
         peer_name = peer_info['peer_name']
 
         peer = net.get(peer_name)
-        peer.cmd(f'cd ./results/{args.seed} && echo "Starting peer application for {peer_name}" > {peer_name}.log &')
+        peer.cmd(f'cd ./results/{args.n_peers}/{args.seed} && echo "Starting peer application for {peer_name}" > {peer_name}.log &')
 
 def run_simulation():
     """Main function to set up and run the simulation."""
@@ -417,7 +417,9 @@ def run_simulation():
     run_peer_applications(net, topo)
         
     # Start CLI
-    CLI(net)
+    # CLI(net)
+    
+    time.sleep(3)
     
     # Cleanup
     print("\nStopping network...")
