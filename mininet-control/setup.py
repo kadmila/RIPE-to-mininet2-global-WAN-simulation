@@ -10,6 +10,7 @@ import json
 import math
 import random
 import argparse
+import time
 
 # Add mininet to path
 module_path = os.path.abspath('../mininet')
@@ -56,8 +57,6 @@ if args.seed is not None:
 # ------------------------------------------------------------------
 
 CONFIG_PATH = './city_config.json'
-DEFAULT_BANDWIDTH = 1000  # 1 Gbps
-PEER_BANDWIDTH = 250  # 250 Mbps
 
 def load_city_config():
     """Load and return city configuration from JSON file."""
@@ -214,8 +213,7 @@ class GlobalWANTopo(Topo):
                     intfName2=f'r_{city2}-{city1}',
                     cls=TCLink,
                     delay=f'{delay_ms:.2f}ms',
-                    jitter=f'{jitter_ms:.2f}ms',
-                    bw=DEFAULT_BANDWIDTH
+                    jitter=f'{jitter_ms:.2f}ms'
                 )
                 
                 # Store link metadata for routing configuration
@@ -271,8 +269,7 @@ class GlobalWANTopo(Topo):
                     intfName1=f'h_eth1',
                     intfName2=f's_{city_abbr}-h{peer_number}',
                     cls=TCLink,
-                    delay=f'{delay_ms:.2f}ms',
-                    bw=PEER_BANDWIDTH
+                    delay=f'{delay_ms:.2f}ms'
                 )
                 
                 # Store peer metadata
@@ -285,6 +282,8 @@ class GlobalWANTopo(Topo):
                     'ip': peer_ip,
                     'gateway': gateway_ip
                 })
+
+                print(f'  Peer {peer_number}: {CITY_NAMES[city_abbr]} delay: {delay_ms:.2f} ms, IP: {peer_ip}')
             
             print(f'  Created {len(PEER_CONFIG)} peers across {len(set(p[0] for p in PEER_CONFIG))} cities')
 
@@ -364,86 +363,35 @@ def configure_routers(net, topo):
         # Add routes: each router adds a route to reach the other router's IP
         router1.cmd(f'ip route add {ip2} dev {intf1}')
         router2.cmd(f'ip route add {ip1} dev {intf2}')
+
+        # Add routes: route peer traffic via the other router
+        city1_number = CITY_NUMBERS[city1]
+        city2_number = CITY_NUMBERS[city2]
+        peer_network1 = f'20.{city1_number}.0.0/16'
+        peer_network2 = f'20.{city2_number}.0.0/16'
+        router1.cmd(f'ip route add {peer_network2} via {ip2} dev {intf1}')
+        router2.cmd(f'ip route add {peer_network1} via {ip1} dev {intf2}')
         
-        print(f'    Link {link_id}: {city1} ({ip1}) <-> {city2} ({ip2})')
+        # print(f'    Link {link_id}: {city1} ({ip1}) <-> {city2} ({ip2})')
     
     print(f'\n  Configuration complete: {len(routers_configured)} routers, {len(topo.links_info)} links')
 
+# ------------------------------------------------------------------
+# Application Configuration
+# ------------------------------------------------------------------
 
-def validate_network(net, topo):
-    """
-    Validate network configuration and test connectivity.
-    
-    Args:
-        net: Mininet network instance
-        topo: GlobalWANTopo instance
-    """
-    print("\n" + "=" * 70)
-    print("Network Validation")
-    print("=" * 70)
-    
-    # Sample a few routers to validate
-    sample_cities = CITY_ABBRS[:3] if len(CITY_ABBRS) >= 3 else CITY_ABBRS
-    
-    print("\nSample Router Interface Configuration:")
-    print("-" * 70)
-    for city_abbr in sample_cities:
-        router = net.get(f'r_{city_abbr}')
-        city_name = CITY_NAMES[city_abbr]
-        print(f"\n{city_name} ({city_abbr}):")
-        print(router.cmd('ip addr show | grep -E "^[0-9]+:|inet "'))
-    
-    print("\nSample Router Routing Tables:")
-    print("-" * 70)
-    for city_abbr in sample_cities:
-        router = net.get(f'r_{city_abbr}')
-        city_name = CITY_NAMES[city_abbr]
-        print(f"\n{city_name} ({city_abbr}):")
-        print(router.cmd('ip route | head -10'))
-    
-    # Test connectivity between a few city pairs
-    print("\nConnectivity Tests (Sample):")
-    print("-" * 70)
-    if len(CITY_ABBRS) >= 2:
-        # Test first to second city
-        city1 = CITY_ABBRS[0]
-        city2 = CITY_ABBRS[1]
-        
-        router1 = net.get(f'r_{city1}')
-        
-        # Find the IP of router2's interface connected to router1
-        link_info = None
-        for link in topo.links_info:
-            if (link['city1'] == city1 and link['city2'] == city2) or \
-               (link['city1'] == city2 and link['city2'] == city1):
-                link_info = link
-                break
-        
-        if link_info:
-            link_id = link_info['link_id']
-            # Determine which IP belongs to router2
-            if link_info['city1'] == city1:
-                target_ip = f'10.{link_id}.0.2'
-            else:
-                target_ip = f'10.{link_id}.0.1'
-            
-            print(f"\nPing test: {CITY_NAMES[city1]} -> {CITY_NAMES[city2]}")
-            print(f"Target IP: {target_ip}")
-            result = router1.cmd(f'ping -c 3 {target_ip}')
-            print(result)
-    
-    print("=" * 70)
+def run_peer_applications(net, topo):
+    for peer_info in topo.peers_info:
+        peer_name = peer_info['peer_name']
 
+        peer = net.get(peer_name)
+        peer.cmd(f'cd ./results/{args.seed} && echo "Starting peer application for {peer_name}" > {peer_name}.log &')
 
 def run_simulation():
     """Main function to set up and run the simulation."""
     
-    print("=" * 70)
-    print("Global WAN Simulation - 19 City Router Mesh")
-    print("=" * 70)
-    
     # Set log level
-    setLogLevel('info')
+    setLogLevel('output')
     
     # Create topology
     print("\nBuilding topology...")
@@ -464,6 +412,9 @@ def run_simulation():
     
     # Start network
     net.start()
+
+    time.sleep(3)
+    run_peer_applications(net, topo)
         
     # Start CLI
     CLI(net)
