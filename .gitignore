@@ -64,4 +64,4 @@ dkms.conf
 /oftest
 /pox
 
-*.venv/
+/mininet-control/results
