@@ -423,8 +423,8 @@ def run_simulation():
     
     # Start network
     net.start()
-
     time.sleep(3)
+
     print("\nRunning peer applications...")
     run_peer_applications(net, topo)
     print("Peer applications started.")
