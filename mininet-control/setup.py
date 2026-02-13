@@ -380,23 +380,91 @@ def configure_routers(net, topo):
 # Application Configuration
 # ------------------------------------------------------------------
 
+def gen_scenario_scale(net, topo):
+    """
+    Generate scenario files for each peer.
+    Creates files h1 to h{n_peers} in ./tmp/scenario directory.
+    Each file contains a JSON array.
+    """
+    scenario_dir = './tmp/scenario'
+    peer_names = [peer_info['peer_name'] for peer_info in topo.peers_info]
+
+    time_now = 0
+    scenario_data = {peer_name: [] for peer_name in peer_names}
+
+    # initial world
+    scenario_data['h1'].append({
+        'time': f'{time_now}',
+        'do': 'open',
+    })
+
+    # prepare for dial
+    for i in range(2, 11):
+        scenario_data['h1'].append({
+            'time': f'{time_now}',
+            'do': 'add',
+            'id': f'h{i}',
+        })
+    for i in range(2, 11):
+        scenario_data[f'h{i}'].append({
+            'time': f'{time_now}',
+            'do': 'add',
+            'id': 'h1',
+        })
+
+    # initial 10: join to first one.
+    time_now += 1
+    for i in range(2, 11):
+        scenario_data[f'h{i}'].append({
+            'time': f'{time_now}',
+            'do': 'dial',
+            'id': 'h1',
+        })
+
+    time_now += 1
+    for i in range(2, 11):
+        scenario_data[f'h{i}'].append({
+            'time': f'{time_now}',
+            'do': 'join',
+            'id': 'h1',
+        })
+    
+    # followings: join to one of the previous ones. (h11 ~ h100)
+    for cycle in range(1, 10):
+        pass
+    
+    for peer_name in peer_names:
+        file_path = os.path.join(scenario_dir, peer_name)
+        
+        with open(file_path, 'w') as f:
+            json.dump(scenario_data[peer_name], f)
+
 def run_peer_applications(net, topo):
     peers = [(net.get(peer_info['peer_name']), peer_info['peer_name']) for peer_info in topo.peers_info]
+    results_path = f'./results/{args.n_peers}/{args.seed}'
+    scenario_dir = './tmp/scenario'
+    contact_dir = './tmp/contact'
+
+    gen_scenario_scale(net, topo)
 
     for peer, peer_name in peers:
-        peer.cmd(f'ifstat -i h_eth1 -n > ./results/{args.n_peers}/{args.seed}/ifstat_{peer_name}.log &')
+        peer.cmd(f'ifstat -i h_eth1 -n 0.1 > {results_path}/ifstat_{peer_name}.log &')
         
-    target_ip = topo.peers_info[0]['ip']
+    time_start = int(time.time()) + 3
     for peer, peer_name in peers:
-        peer.cmd(f'ping -c 5 {target_ip} &')
-        
+        peer.cmd(f'./abyss_test/scenario_run --id={peer_name} --contact_dir={contact_dir} --t_start={time_start} --duration=10 --scenario={scenario_dir}/{peer_name} --out {results_path}/evnt_{peer_name}.log  &> {results_path}/out_{peer_name}.log &')
+        # peer.cmd(f'ping -c 5 {target_ip} &')
         # peer.cmd(f'cd ./results/{args.n_peers}/{args.seed} && echo "Starting peer application for {peer_name}" > {peer_name}.log &')
 
 def stop_peer_applications(net, topo):
-    for peer_info in topo.peers_info:
-        peer_name = peer_info['peer_name']
+    peer_names = [peer_info['peer_name'] for peer_info in topo.peers_info]
+    for peer_name in peer_names:
         peer = net.get(peer_name)
         peer.cmd('pkill ifstat')
+    
+    for peer_name in peer_names:
+        peer = net.get(peer_name)
+        peer.cmd('wait')
 
 def run_simulation():
     """Main function to set up and run the simulation."""

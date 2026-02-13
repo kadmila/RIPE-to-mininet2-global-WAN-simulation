@@ -16,6 +16,8 @@ import (
 // ScenarioRunner executes a sequence of actions defined in a scenario
 type ScenarioRunner struct {
 	contact_dir string
+	time_start  int64
+	time_end    int64
 	scenario    []map[string]string
 	host        *ahost.AbyssHost
 	out_f       *os.File
@@ -25,13 +27,15 @@ type ScenarioRunner struct {
 }
 
 // NewScenarioRunner creates a new ScenarioRunner with the given scenario and host
-func NewScenarioRunner(contact_dir string, scenario []map[string]string, host *ahost.AbyssHost, output_path string) *ScenarioRunner {
+func NewScenarioRunner(contact_dir string, time_start int64, duration int64, scenario []map[string]string, host *ahost.AbyssHost, output_path string) *ScenarioRunner {
 	out_f, err := os.Create(output_path)
 	if err != nil {
 		log.Fatalf("Error reading scenario file: %v", err)
 	}
 	return &ScenarioRunner{
 		contact_dir: contact_dir,
+		time_start:  time_start,
+		time_end:    time_start + duration,
 		scenario:    scenario,
 		host:        host,
 		out_f:       out_f,
@@ -55,7 +59,12 @@ func (sr *ScenarioRunner) Run() error {
 			continue
 		}
 
-		targetTime := time.Unix(timestamp, 0)
+		target_timestamp := sr.time_start + timestamp
+		if target_timestamp >= sr.time_end {
+			break
+		}
+
+		targetTime := time.Unix(target_timestamp, 0)
 		now := time.Now()
 
 		if targetTime.After(now) {
@@ -131,6 +140,16 @@ func (sr *ScenarioRunner) Run() error {
 
 		}
 	}
+
+	targetTime := time.Unix(sr.time_end, 0)
+	now := time.Now()
+
+	if targetTime.After(now) {
+		waitDuration := targetTime.Sub(now)
+		time.Sleep(waitDuration)
+	}
+
+	sr.out_f.Close()
 	return nil
 }
 
@@ -179,6 +198,14 @@ func (sr *ScenarioRunner) HandleEvents() {
 				sr.world = nil
 				fmt.Fprintf(sr.out_f, "%d X %v\n", time.Now().UnixMilli(), event.World.SessionID())
 			}
+			// case *ahost.EPeerConnected:
+			// 	fmt.Fprintf(sr.out_f, "%d Cn %v\n", time.Now().UnixMilli(), event.PeerID)
+			// case *ahost.EPeerDisconnected:
+			// 	fmt.Fprintf(sr.out_f, "%d Dc %v\n", time.Now().UnixMilli(), event.PeerID)
+			// case *ahost.EPeerFound:
+			// 	fmt.Fprintf(sr.out_f, "%d Fd %v\n", time.Now().UnixMilli(), event.PeerID)
+			// case *ahost.EPeerForgot:
+			// 	fmt.Fprintf(sr.out_f, "%d Fg %v\n", time.Now().UnixMilli(), event.PeerID)
 		}
 
 		sr.world_mtx.Unlock()

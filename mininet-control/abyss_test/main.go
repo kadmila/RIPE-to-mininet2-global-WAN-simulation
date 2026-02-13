@@ -15,14 +15,16 @@ import (
 
 func main() {
 	// Parse CLI arguments
-	var n_peer int
 	var id string
 	var contact_dir string
+	var time_start int64
+	var duration int64
 	var scenario_path string
 	var output_path string
-	flag.IntVar(&n_peer, "n_peer", 0, "number of peers")
 	flag.StringVar(&id, "id", "", "host id")
 	flag.StringVar(&contact_dir, "contact_dir", "", "path to directory for sharing contact information")
+	flag.Int64Var(&time_start, "t_start", 1897157308, "time to start the scenario")
+	flag.Int64Var(&duration, "duration", 0, "maximum execution duration")
 	flag.StringVar(&scenario_path, "scenario", "", "path to scenario JSON file")
 	flag.StringVar(&output_path, "out", "", "path to output file")
 	flag.Parse()
@@ -42,7 +44,7 @@ func main() {
 	}
 
 	// Read ../credentials/{id}.pem and parse key
-	key_pem, err := os.ReadFile(fmt.Sprintf("../credentials/%s.pem", id))
+	key_pem, err := os.ReadFile(fmt.Sprintf("./credentials/%s.pem", id))
 	if err != nil {
 		log.Fatalf("Error reading private key file: %v", err)
 	}
@@ -95,6 +97,6 @@ func main() {
 	}
 	id_f.Close() // Ensure the file is closed
 
-	scenario_runner := NewScenarioRunner(contact_dir, scenario, host, output_path)
+	scenario_runner := NewScenarioRunner(contact_dir, time_start, duration, scenario, host, output_path)
 	scenario_runner.Run()
 }
