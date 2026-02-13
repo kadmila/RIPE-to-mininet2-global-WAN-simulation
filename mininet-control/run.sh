@@ -30,5 +30,5 @@ run_seed_range() {
     done
 }
 
-#run_seed_range 10 0 9
-run_experiment 100 0
+run_seed_range 300 1 9
+#run_experiment 300 0

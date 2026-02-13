@@ -283,7 +283,7 @@ class GlobalWANTopo(Topo):
                     'gateway': gateway_ip
                 })
 
-                print(f'  Peer {peer_number}: {CITY_NAMES[city_abbr]} delay: {delay_ms:.2f} ms, IP: {peer_ip}')
+                #print(f'  Peer {peer_number}: {CITY_NAMES[city_abbr]} delay: {delay_ms:.2f} ms, IP: {peer_ip}')
             
             print(f'  Created {len(PEER_CONFIG)} peers across {len(set(p[0] for p in PEER_CONFIG))} cities')
 
@@ -380,7 +380,7 @@ def configure_routers(net, topo):
 # Application Configuration
 # ------------------------------------------------------------------
 
-def gen_scenario_scale(net, topo):
+def gen_scenario_scale(net, topo) -> int:
     """
     Generate scenario files for each peer.
     Creates files h1 to h{n_peers} in ./tmp/scenario directory.
@@ -429,9 +429,47 @@ def gen_scenario_scale(net, topo):
             'id': 'h1',
         })
     
-    # followings: join to one of the previous ones. (h11 ~ h100)
-    for cycle in range(1, 10):
-        pass
+    # followings: join to one of the previous ones. (h11 ~ )
+    for cycle in range(1, args.n_peers // 10):
+        time_now += 10 # 10 - second gap for stabilization
+
+        # (joiner id, target id)[10]
+        join_targets_ids = [(f'h{10 * cycle + i}', f'h{random.randint(1, 10 * cycle)}') for i in range(1, 11)]
+
+        for joiner_id, target_id in join_targets_ids:
+            scenario_data[target_id].append({
+                'time': f'{time_now}',
+                'do': 'add',
+                'id': joiner_id
+            })
+            scenario_data[joiner_id].append({
+                'time': f'{time_now}',
+                'do': 'add',
+                'id': target_id
+            })
+
+        time_now += 1
+
+        for joiner_id, target_id in join_targets_ids:
+            scenario_data[target_id].append({
+                'time': f'{time_now}',
+                'do': 'dial',
+                'id': joiner_id
+            })
+            scenario_data[joiner_id].append({
+                'time': f'{time_now}',
+                'do': 'dial',
+                'id': target_id
+            })
+
+        time_now += 1
+        
+        for joiner_id, target_id in join_targets_ids:
+            scenario_data[joiner_id].append({
+                'time': f'{time_now}',
+                'do': 'join',
+                'id': target_id,
+            })
     
     for peer_name in peer_names:
         file_path = os.path.join(scenario_dir, peer_name)
@@ -439,22 +477,28 @@ def gen_scenario_scale(net, topo):
         with open(file_path, 'w') as f:
             json.dump(scenario_data[peer_name], f)
 
-def run_peer_applications(net, topo):
+    time_now += 10
+    return time_now
+
+def run_peer_applications(net, topo) -> int:
     peers = [(net.get(peer_info['peer_name']), peer_info['peer_name']) for peer_info in topo.peers_info]
     results_path = f'./results/{args.n_peers}/{args.seed}'
     scenario_dir = './tmp/scenario'
     contact_dir = './tmp/contact'
 
-    gen_scenario_scale(net, topo)
+    print("Generating scenario...")
+    scenario_duration = gen_scenario_scale(net, topo)
 
+    print("Starting ifstat...")
     for peer, peer_name in peers:
         peer.cmd(f'ifstat -i h_eth1 -n 0.1 > {results_path}/ifstat_{peer_name}.log &')
         
-    time_start = int(time.time()) + 3
+    time_start = int(time.time()) + 10
+    print("Starting application...")
     for peer, peer_name in peers:
-        peer.cmd(f'./abyss_test/scenario_run --id={peer_name} --contact_dir={contact_dir} --t_start={time_start} --duration=10 --scenario={scenario_dir}/{peer_name} --out {results_path}/evnt_{peer_name}.log  &> {results_path}/out_{peer_name}.log &')
-        # peer.cmd(f'ping -c 5 {target_ip} &')
-        # peer.cmd(f'cd ./results/{args.n_peers}/{args.seed} && echo "Starting peer application for {peer_name}" > {peer_name}.log &')
+        peer.cmd(f'./abyss_test/scenario_run --id={peer_name} --contact_dir={contact_dir} --t_start={time_start} --duration={scenario_duration} --scenario={scenario_dir}/{peer_name} --out {results_path}/evnt_{peer_name}.log  &> {results_path}/out_{peer_name}.log &')
+    
+    return scenario_duration
 
 def stop_peer_applications(net, topo):
     peer_names = [peer_info['peer_name'] for peer_info in topo.peers_info]
@@ -494,13 +538,13 @@ def run_simulation():
     time.sleep(3)
 
     print("\nRunning peer applications...")
-    run_peer_applications(net, topo)
+    scenario_duration = run_peer_applications(net, topo)
     print("Peer applications started.")
         
     # Start CLI
     #CLI(net)
     
-    time.sleep(10)
+    time.sleep(scenario_duration + 12)
 
     print("\nStopping peer applications...")
     stop_peer_applications(net, topo)
