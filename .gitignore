@@ -72,3 +72,6 @@ dkms.conf
 */.venv
 
 /mininet-control/plotter/*.jpg
+
+/mininet-control/main_results
+/mininet-control/main_processed_data
