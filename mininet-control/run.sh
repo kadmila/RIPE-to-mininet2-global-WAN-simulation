@@ -60,4 +60,4 @@ run_stability_seed_range() {
 # run_seed_range 300 0 9
 # run_experiment 10 0
 
-run_stability_experiment 101 1 0
+run_stability_experiment 150 50 0

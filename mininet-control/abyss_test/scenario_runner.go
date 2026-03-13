@@ -176,32 +176,19 @@ func (sr *ScenarioRunner) HandleEvents() {
 
 		switch event := any_event.(type) {
 		case *and.EANDWorldEnter:
-
-			if sr.world != nil && sr.world.WSID == event.WSID {
-				sr.host.ExposeWorldForJoin(sr.world, "/") // this should not fail.
-				fmt.Fprintf(sr.out_f, "%d E %v\n", time.Now().UnixMilli(), event.WSID)
-			}
+			sr.host.ExposeWorldForJoin(sr.world, "/") // this should not fail.
+			fmt.Fprintf(sr.out_f, "%d E %v\n", time.Now().UnixMilli(), event.WSID)
 
 		case *and.EANDSessionReady:
-
-			if sr.world != nil && sr.world.WSID == event.WSID {
-				fmt.Fprintf(sr.out_f, "%d J %v\n", time.Now().UnixMilli(), event.SessionID)
-			}
+			fmt.Fprintf(sr.out_f, "%d J %v\n", time.Now().UnixMilli(), event.SessionID)
 
 		case *and.EANDSessionClose:
-
-			if sr.world != nil && sr.world.WSID == event.WSID {
-				fmt.Fprintf(sr.out_f, "%d L %v\n", time.Now().UnixMilli(), event.SessionID)
-			}
+			fmt.Fprintf(sr.out_f, "%d L %v\n", time.Now().UnixMilli(), event.SessionID)
 
 		case *and.EANDObjectAppend:
 		case *and.EANDObjectDelete:
 		case *and.EANDWorldLeave:
-
-			if sr.world != nil && sr.world.WSID == event.WSID {
-				sr.world = nil
-				fmt.Fprintf(sr.out_f, "%d X %v\n", time.Now().UnixMilli(), event.WSID)
-			}
+			fmt.Fprintf(sr.out_f, "%d X %v\n", time.Now().UnixMilli(), event.WSID)
 			// case *ahost.EPeerConnected:
 			// 	fmt.Fprintf(sr.out_f, "%d Cn %v\n", time.Now().UnixMilli(), event.PeerID)
 			// case *ahost.EPeerDisconnected:

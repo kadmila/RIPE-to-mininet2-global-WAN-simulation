@@ -489,11 +489,6 @@ def gen_scenario_scale(net, topo) -> int:
         leave_targets_ids = random.sample(sorted(peers_in_world), args.n_churn)
         for leave_target_id in leave_targets_ids:
             peers_in_world.remove(leave_target_id)
-            scenario_data[leave_target_id].append({
-                'time': f'{time_now}',
-                'do': 'close',
-                'id': leave_target_id
-            })
 
         join_targets_ids = [(f'h{100 + args.n_churn * cycle + i}', f'{random.sample(sorted(peers_in_world), 1)[0]}') for i in range(1, args.n_churn +1)]
         for joiner_id, target_id in join_targets_ids:
@@ -529,6 +524,13 @@ def gen_scenario_scale(net, topo) -> int:
                 'time': f'{time_now}',
                 'do': 'join',
                 'id': target_id,
+            })
+
+        for leave_target_id in leave_targets_ids:
+            scenario_data[leave_target_id].append({
+                'time': f'{time_now}',
+                'do': 'close',
+                'id': leave_target_id
             })
             
         for joiner_id, _ in join_targets_ids:
