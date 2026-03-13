@@ -73,5 +73,12 @@ dkms.conf
 
 /mininet-control/plotter/*.jpg
 
+/mininet-control/abyss_test/abyss_core
+
+# local old files
 /mininet-control/main_results
 /mininet-control/main_processed_data
+/mininet-control/old_data
+/mininet-control/processed_data
+/mininet-control/plots
+

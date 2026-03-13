@@ -46,6 +46,8 @@ func NewScenarioRunner(contact_dir string, time_start int64, duration int64, sce
 func (sr *ScenarioRunner) Run() error {
 	go sr.HandleEvents()
 
+	log.Printf("Start")
+
 	for i, step := range sr.scenario {
 		timeStr, ok := step["time"]
 		if !ok {
@@ -107,7 +109,6 @@ func (sr *ScenarioRunner) Run() error {
 			sr.world_mtx.Lock()
 			if sr.world != nil {
 				sr.host.CloseWorld(sr.world) // This automatically frees world path
-				fmt.Fprintf(sr.out_f, "%d X %v\n", time.Now().UnixMilli(), sr.world.SessionID())
 			}
 			sr.world = nil
 			sr.world_mtx.Unlock()
@@ -133,9 +134,17 @@ func (sr *ScenarioRunner) Run() error {
 			sr.world_mtx.Lock()
 			if sr.world != nil {
 				sr.host.CloseWorld(sr.world) // This automatically frees world path
-				fmt.Fprintf(sr.out_f, "%d X %v\n", time.Now().UnixMilli(), sr.world.SessionID())
 			}
-			sr.world = sr.host.OpenWorld("https://www.example.com")
+			sr.world, err = sr.host.OpenWorld("https://www.example.com")
+			sr.world_mtx.Unlock()
+
+		case "close":
+
+			sr.world_mtx.Lock()
+			if sr.world != nil {
+				sr.host.CloseWorld(sr.world) // This automatically frees world path
+			}
+			sr.world = nil
 			sr.world_mtx.Unlock()
 
 		}
@@ -150,6 +159,7 @@ func (sr *ScenarioRunner) Run() error {
 	}
 
 	sr.out_f.Close()
+	log.Printf("Finish")
 	return nil
 }
 
@@ -167,36 +177,30 @@ func (sr *ScenarioRunner) HandleEvents() {
 		switch event := any_event.(type) {
 		case *and.EANDWorldEnter:
 
-			if sr.world != nil && sr.world.SessionID() == event.World.SessionID() {
+			if sr.world != nil && sr.world.WSID == event.WSID {
 				sr.host.ExposeWorldForJoin(sr.world, "/") // this should not fail.
-				fmt.Fprintf(sr.out_f, "%d E %v\n", time.Now().UnixMilli(), event.World.SessionID())
-			}
-
-		case *and.EANDSessionRequest:
-
-			if sr.world != nil && sr.world.SessionID() == event.World.SessionID() {
-				sr.host.AcceptWorldSession(sr.world, event.Peer.ID(), event.SessionID)
+				fmt.Fprintf(sr.out_f, "%d E %v\n", time.Now().UnixMilli(), event.WSID)
 			}
 
 		case *and.EANDSessionReady:
 
-			if sr.world != nil && sr.world.SessionID() == event.World.SessionID() {
+			if sr.world != nil && sr.world.WSID == event.WSID {
 				fmt.Fprintf(sr.out_f, "%d J %v\n", time.Now().UnixMilli(), event.SessionID)
 			}
 
 		case *and.EANDSessionClose:
 
-			if sr.world != nil && sr.world.SessionID() == event.World.SessionID() {
+			if sr.world != nil && sr.world.WSID == event.WSID {
 				fmt.Fprintf(sr.out_f, "%d L %v\n", time.Now().UnixMilli(), event.SessionID)
 			}
 
 		case *and.EANDObjectAppend:
 		case *and.EANDObjectDelete:
-		case *and.EANDWorldLeave: // join failure.
+		case *and.EANDWorldLeave:
 
-			if sr.world != nil && sr.world.SessionID() == event.World.SessionID() {
+			if sr.world != nil && sr.world.WSID == event.WSID {
 				sr.world = nil
-				fmt.Fprintf(sr.out_f, "%d X %v\n", time.Now().UnixMilli(), event.World.SessionID())
+				fmt.Fprintf(sr.out_f, "%d X %v\n", time.Now().UnixMilli(), event.WSID)
 			}
 			// case *ahost.EPeerConnected:
 			// 	fmt.Fprintf(sr.out_f, "%d Cn %v\n", time.Now().UnixMilli(), event.PeerID)

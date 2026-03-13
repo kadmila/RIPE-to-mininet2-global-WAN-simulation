@@ -23,7 +23,7 @@ func main() {
 	var output_path string
 	flag.StringVar(&id, "id", "", "host id")
 	flag.StringVar(&contact_dir, "contact_dir", "", "path to directory for sharing contact information")
-	flag.Int64Var(&time_start, "t_start", 1897157308, "time to start the scenario")
+	flag.Int64Var(&time_start, "t_start", 0, "time to start the scenario")
 	flag.Int64Var(&duration, "duration", 0, "maximum execution duration")
 	flag.StringVar(&scenario_path, "scenario", "", "path to scenario JSON file")
 	flag.StringVar(&output_path, "out", "", "path to output file")
