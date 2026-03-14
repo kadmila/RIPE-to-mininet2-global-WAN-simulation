@@ -16,8 +16,8 @@ import (
 // ScenarioRunner executes a sequence of actions defined in a scenario
 type ScenarioRunner struct {
 	contact_dir string
-	time_start  int64
-	time_end    int64
+	time_start  time.Time
+	time_end    time.Time
 	scenario    []map[string]string
 	host        *ahost.AbyssHost
 	out_f       *os.File
@@ -27,7 +27,7 @@ type ScenarioRunner struct {
 }
 
 // NewScenarioRunner creates a new ScenarioRunner with the given scenario and host
-func NewScenarioRunner(contact_dir string, time_start int64, duration int64, scenario []map[string]string, host *ahost.AbyssHost, output_path string) *ScenarioRunner {
+func NewScenarioRunner(contact_dir string, time_start time.Time, duration time.Duration, scenario []map[string]string, host *ahost.AbyssHost, output_path string) *ScenarioRunner {
 	out_f, err := os.Create(output_path)
 	if err != nil {
 		log.Fatalf("Error reading scenario file: %v", err)
@@ -35,7 +35,7 @@ func NewScenarioRunner(contact_dir string, time_start int64, duration int64, sce
 	return &ScenarioRunner{
 		contact_dir: contact_dir,
 		time_start:  time_start,
-		time_end:    time_start + duration,
+		time_end:    time_start.Add(duration),
 		scenario:    scenario,
 		host:        host,
 		out_f:       out_f,
@@ -61,101 +61,111 @@ func (sr *ScenarioRunner) Run() error {
 			continue
 		}
 
-		target_timestamp := sr.time_start + timestamp
-		if target_timestamp >= sr.time_end {
+		target_timestamp := sr.time_start.Add(time.Duration(timestamp) * time.Second)
+		if target_timestamp.After(sr.time_end) {
 			break
 		}
 
-		targetTime := time.Unix(target_timestamp, 0)
 		now := time.Now()
-
-		if targetTime.After(now) {
-			waitDuration := targetTime.Sub(now)
+		if target_timestamp.After(now) {
+			waitDuration := target_timestamp.Sub(now)
 			time.Sleep(waitDuration)
 		}
 
-		// Action
-		switch step["do"] {
-		case "add":
+		done := make(chan bool, 1)
+		tst_s := 0
+		go func() {
+			// Action
+			switch step["do"] {
+			case "add":
 
-			peer_id := step["id"]
-			rc, err := os.ReadFile(path.Join(sr.contact_dir, peer_id+"_rc"))
-			if err != nil {
-				log.Fatalf("unable to read file: %v", err)
-			}
-			hs, err := os.ReadFile(path.Join(sr.contact_dir, peer_id+"_hs"))
-			if err != nil {
-				log.Fatalf("unable to read file: %v", err)
-			}
-			sr.host.AppendKnownPeer(string(rc), string(hs))
+				peer_id := step["id"]
+				rc, err := os.ReadFile(path.Join(sr.contact_dir, peer_id+"_rc"))
+				if err != nil {
+					log.Fatalf("unable to read file: %v", err)
+				}
+				hs, err := os.ReadFile(path.Join(sr.contact_dir, peer_id+"_hs"))
+				if err != nil {
+					log.Fatalf("unable to read file: %v", err)
+				}
+				sr.host.AppendKnownPeer(string(rc), string(hs))
 
-		case "dial":
+			case "dial":
 
-			peer_id := step["id"]
-			id_hash, err := os.ReadFile(path.Join(sr.contact_dir, peer_id+"_id"))
-			if err != nil {
-				log.Fatalf("unable to read file: %v", err)
-			}
-			sr.host.Dial(string(id_hash))
+				peer_id := step["id"]
+				id_hash, err := os.ReadFile(path.Join(sr.contact_dir, peer_id+"_id"))
+				if err != nil {
+					log.Fatalf("unable to read file: %v", err)
+				}
+				sr.host.Dial(string(id_hash))
 
-		case "join":
+			case "join":
 
-			peer_id := step["id"]
-			id_hash, err := os.ReadFile(path.Join(sr.contact_dir, peer_id+"_id"))
-			if err != nil {
-				log.Fatalf("unable to read file: %v", err)
-			}
-
-			sr.world_mtx.Lock()
-			if sr.world != nil {
-				sr.host.CloseWorld(sr.world) // This automatically frees world path
-			}
-			sr.world = nil
-			sr.world_mtx.Unlock()
-
-			for i := range 100 {
-				if i == 99 {
-					log.Println("Error: Failed to join. This is a failure.")
-					break
+				peer_id := step["id"]
+				id_hash, err := os.ReadFile(path.Join(sr.contact_dir, peer_id+"_id"))
+				if err != nil {
+					log.Fatalf("unable to read file: %v", err)
 				}
 
 				sr.world_mtx.Lock()
-				sr.world, err = sr.host.JoinWorld(string(id_hash), "/")
+				if sr.world != nil {
+					sr.host.CloseWorld(sr.world) // This automatically frees world path
+				}
+				sr.world = nil
 				sr.world_mtx.Unlock()
 
-				if err == nil {
-					break
+				for i := range 100 {
+					if i == 99 {
+						log.Println("Error: Failed to join. This is a failure.")
+						break
+					}
+
+					sr.world_mtx.Lock()
+					sr.world, err = sr.host.JoinWorld(string(id_hash), "/")
+					sr.world_mtx.Unlock()
+
+					if err == nil {
+						break
+					}
+					time.Sleep(time.Millisecond * 100)
 				}
-				time.Sleep(time.Millisecond * 100)
+
+			case "open":
+
+				sr.world_mtx.Lock()
+				if sr.world != nil {
+					sr.host.CloseWorld(sr.world) // This automatically frees world path
+				}
+				sr.world, err = sr.host.OpenWorld("https://www.example.com")
+				sr.world_mtx.Unlock()
+
+			case "close":
+
+				tst_s = 1
+				sr.world_mtx.Lock()
+				if sr.world != nil {
+					tst_s = 2
+					sr.host.CloseWorld(sr.world) // This automatically frees world path
+				}
+				sr.world = nil
+				sr.world_mtx.Unlock()
+
 			}
-
-		case "open":
-
-			sr.world_mtx.Lock()
-			if sr.world != nil {
-				sr.host.CloseWorld(sr.world) // This automatically frees world path
-			}
-			sr.world, err = sr.host.OpenWorld("https://www.example.com")
-			sr.world_mtx.Unlock()
-
-		case "close":
-
-			sr.world_mtx.Lock()
-			if sr.world != nil {
-				sr.host.CloseWorld(sr.world) // This automatically frees world path
-			}
-			sr.world = nil
-			sr.world_mtx.Unlock()
-
+			done <- true
+		}()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			//fatal: timeout for scenario execution
+			log.Printf("Fatal: Scenario Execution Timeout: ")
+			fmt.Println("failed action: " + step["do"] + strconv.Itoa(tst_s))
+			os.Exit(1)
 		}
 	}
 
-	targetTime := time.Unix(sr.time_end, 0)
 	now := time.Now()
-
-	if targetTime.After(now) {
-		waitDuration := targetTime.Sub(now)
-		time.Sleep(waitDuration)
+	if sr.time_end.After(now) {
+		time.Sleep(sr.time_end.Sub(now))
 	}
 
 	sr.out_f.Close()
@@ -171,8 +181,6 @@ func (sr *ScenarioRunner) HandleEvents() {
 		if !ok {
 			break
 		}
-
-		sr.world_mtx.Lock()
 
 		switch event := any_event.(type) {
 		case *and.EANDWorldEnter:
@@ -198,7 +206,5 @@ func (sr *ScenarioRunner) HandleEvents() {
 			// case *ahost.EPeerForgot:
 			// 	fmt.Fprintf(sr.out_f, "%d Fg %v\n", time.Now().UnixMilli(), event.PeerID)
 		}
-
-		sr.world_mtx.Unlock()
 	}
 }

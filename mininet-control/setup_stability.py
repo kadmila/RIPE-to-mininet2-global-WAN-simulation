@@ -405,13 +405,13 @@ def gen_scenario_scale(net, topo) -> int:
     })
 
     # initial 10: prepare for dial
-    for i in range(2, 11):
+    for i in range(2, 101):
         scenario_data['h1'].append({
             'time': f'{time_now}',
             'do': 'add',
             'id': f'h{i}',
         })
-    for i in range(2, 11):
+    for i in range(2, 101):
         scenario_data[f'h{i}'].append({
             'time': f'{time_now}',
             'do': 'add',
@@ -420,7 +420,7 @@ def gen_scenario_scale(net, topo) -> int:
 
     # initial 10: join to first one.
     time_now += 1
-    for i in range(2, 11):
+    for i in range(2, 101):
         scenario_data[f'h{i}'].append({
             'time': f'{time_now}',
             'do': 'dial',
@@ -428,62 +428,22 @@ def gen_scenario_scale(net, topo) -> int:
         })
 
     time_now += 1
-    for i in range(2, 11):
+    for i in range(2, 101):
         scenario_data[f'h{i}'].append({
             'time': f'{time_now}',
             'do': 'join',
             'id': 'h1',
         })
 
-    # gradually grow to 100
-    for cycle in range(9):
-        time_now += 10 # 10 - second gap for stabilization
-
-        # (joiner id, target id)[10]
-        join_targets_ids = [(f'h{10 + 10 * cycle + i}', f'h{random.randint(1, 10 + 10 * cycle)}') for i in range(1, 11)]
-
-        for joiner_id, target_id in join_targets_ids:
-            scenario_data[target_id].append({
-                'time': f'{time_now}',
-                'do': 'add',
-                'id': joiner_id
-            })
-            scenario_data[joiner_id].append({
-                'time': f'{time_now}',
-                'do': 'add',
-                'id': target_id
-            })
-
-        time_now += 1
-
-        for joiner_id, target_id in join_targets_ids:
-            scenario_data[target_id].append({
-                'time': f'{time_now}',
-                'do': 'dial',
-                'id': joiner_id
-            })
-            scenario_data[joiner_id].append({
-                'time': f'{time_now}',
-                'do': 'dial',
-                'id': target_id
-            })
-
-        time_now += 1
-        
-        for joiner_id, target_id in join_targets_ids:
-            scenario_data[joiner_id].append({
-                'time': f'{time_now}',
-                'do': 'join',
-                'id': target_id,
-            })
-
     peers_in_world = set()
     for i in range(1, 101):
         peers_in_world.add(f'h{i}')
+
+    time_now += 100
     
     # followings: join to peers in the world, leave.
     for cycle in range((args.n_peers - 100) // args.n_churn):
-        time_now += 10 # 10 - second gap for stabilization
+        time_now += 8 # 10 second gap for stabilization
 
         # (joiner id, target id)[args.n_churn]
         leave_targets_ids = random.sample(sorted(peers_in_world), args.n_churn)
@@ -542,7 +502,7 @@ def gen_scenario_scale(net, topo) -> int:
         with open(file_path, 'w') as f:
             json.dump(scenario_data[peer_name], f)
 
-    time_now += 10
+    time_now += 30
     return time_now
 
 def run_peer_applications(net, topo) -> int:
@@ -558,10 +518,10 @@ def run_peer_applications(net, topo) -> int:
     for peer, peer_name in peers:
         peer.cmd(f'ifstat -i h_eth1 -n 0.1 > {results_path}/ifstat_{peer_name}.log &')
         
-    time_start = int(time.time()) + 10
+    time_start_ms = int(time.time() * 1000) + 10_000
     print("Starting application...")
     for peer, peer_name in peers:
-        peer.cmd(f'./abyss_test/scenario_run --id={peer_name} --contact_dir={contact_dir} --t_start={time_start} --duration={scenario_duration} --scenario={scenario_dir}/{peer_name} --out {results_path}/evnt_{peer_name}.log  &> {results_path}/out_{peer_name}.log &')
+        peer.cmd(f'./abyss_test/scenario_run --id={peer_name} --contact_dir={contact_dir} --t_start={time_start_ms} --duration={scenario_duration} --scenario={scenario_dir}/{peer_name} --out {results_path}/evnt_{peer_name}.log  &> {results_path}/out_{peer_name}.log &')
     
     return scenario_duration
 

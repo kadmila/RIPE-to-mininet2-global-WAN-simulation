@@ -1,0 +1,16 @@
+# computing directories
+tmp
+results
+plotter/*.jpg
+processed_data
+
+# data
+ablation
+plots
+old_data
+
+# misc
+dump.log
+abyss_test/abyss_core
+
+

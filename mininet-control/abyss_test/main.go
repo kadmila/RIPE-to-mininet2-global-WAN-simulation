@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"time"
 
 	"github.com/kadmila/Abyss-Browser/abyss_core/ahost"
 	"golang.org/x/crypto/ssh"
@@ -17,13 +18,13 @@ func main() {
 	// Parse CLI arguments
 	var id string
 	var contact_dir string
-	var time_start int64
+	var time_start_ms int64
 	var duration int64
 	var scenario_path string
 	var output_path string
 	flag.StringVar(&id, "id", "", "host id")
 	flag.StringVar(&contact_dir, "contact_dir", "", "path to directory for sharing contact information")
-	flag.Int64Var(&time_start, "t_start", 0, "time to start the scenario")
+	flag.Int64Var(&time_start_ms, "t_start", 0, "time to start the scenario")
 	flag.Int64Var(&duration, "duration", 0, "maximum execution duration")
 	flag.StringVar(&scenario_path, "scenario", "", "path to scenario JSON file")
 	flag.StringVar(&output_path, "out", "", "path to output file")
@@ -97,6 +98,6 @@ func main() {
 	}
 	id_f.Close() // Ensure the file is closed
 
-	scenario_runner := NewScenarioRunner(contact_dir, time_start, duration, scenario, host, output_path)
+	scenario_runner := NewScenarioRunner(contact_dir, time.UnixMilli(time_start_ms), time.Duration(duration)*time.Second, scenario, host, output_path)
 	scenario_runner.Run()
 }

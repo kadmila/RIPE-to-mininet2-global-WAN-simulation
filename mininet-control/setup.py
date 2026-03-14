@@ -431,7 +431,7 @@ def gen_scenario_scale(net, topo) -> int:
     
     # followings: join to one of the previous ones. (h11 ~ )
     for cycle in range(1, args.n_peers // 10):
-        time_now += 10 # 10 - second gap for stabilization
+        time_now += 8 # 10 second gap for stabilization
 
         # (joiner id, target id)[10]
         join_targets_ids = [(f'h{10 * cycle + i}', f'h{random.randint(1, 10 * cycle)}') for i in range(1, 11)]
