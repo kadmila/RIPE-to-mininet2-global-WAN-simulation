@@ -66,9 +66,10 @@ mkdir results
 # run_one_unit 100 300
 # run_one_unit 100 400
 
-run_one_unit 50 400
-run_one_unit 100 400
-run_one_unit 200 400
-run_one_unit 400 400
+run_one_unit 10 400
+# run_one_unit 50 400
+# run_one_unit 100 400
+# run_one_unit 200 400
+# run_one_unit 400 400
 
 #run_stability_experiment 101 1 0
