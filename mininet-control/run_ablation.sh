@@ -40,19 +40,19 @@ run_one_unit() {
     UNIT_INTERVAL=$2
     
     cd abyss_test
-    sed -i "s/\(TimerMinInterval  = \)100/\1${MIN_INTERVAL}/" ./abyss_core/and/utils.go
+    sed -i "s/\(TimerMinInterval  = \)300/\1${MIN_INTERVAL}/" ./abyss_core/and/utils.go
     sed -i "s/\(TimerUnitInterval = \)300/\1${UNIT_INTERVAL}/" ./abyss_core/and/utils.go
     go build -o scenario_run .
     cd ..
 
     sudo rm -rf ./results
 
-    run_stability_seed_range 110 10 0 3
+    run_stability_seed_range 130 30 0 4
     mkdir ablation/t_min_${MIN_INTERVAL}_unit_${UNIT_INTERVAL}
     cp results/110/ -r ablation/t_min_${MIN_INTERVAL}_unit_${UNIT_INTERVAL}/
     
     cd abyss_test
-    sed -i "s/\(TimerMinInterval  = \)${MIN_INTERVAL}/\1100/" ./abyss_core/and/utils.go
+    sed -i "s/\(TimerMinInterval  = \)${MIN_INTERVAL}/\1300/" ./abyss_core/and/utils.go
     sed -i "s/\(TimerUnitInterval = \)${UNIT_INTERVAL}/\1300/" ./abyss_core/and/utils.go
     go build -o scenario_run .
     cd ..
@@ -61,15 +61,12 @@ run_one_unit() {
 rm -rf results
 mkdir results
 
-# run_one_unit 100 100
-# run_one_unit 100 200
+run_one_unit 300 100
+run_one_unit 300 300
+run_one_unit 300 500
+
+# run_one_unit 10 300
 # run_one_unit 100 300
-# run_one_unit 100 400
+# run_one_unit 400 300
 
-run_one_unit 10 400
-# run_one_unit 50 400
-# run_one_unit 100 400
-# run_one_unit 200 400
-# run_one_unit 400 400
-
-#run_stability_experiment 101 1 0
+# run_stability_experiment 130 30 0

@@ -439,7 +439,7 @@ def gen_scenario_scale(net, topo) -> int:
     for i in range(1, 101):
         peers_in_world.add(f'h{i}')
 
-    time_now += 100
+    time_now += 60
     
     # followings: join to peers in the world, leave.
     for cycle in range((args.n_peers - 100) // args.n_churn):
