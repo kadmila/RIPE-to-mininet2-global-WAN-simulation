@@ -25,7 +25,7 @@ run_simulation_one_seed() {
     sudo rm -rf ./results/$N_PEERS/$SEED
     mkdir -p ./results/$N_PEERS/$SEED
     
-    sudo python3 setup_stability.py --n_peers $N_PEERS --n_churn $N_CHURN --seed $SEED 2>&1
+    sudo python3 setup_burst.py --n_peers $N_PEERS --n_churn $N_CHURN --seed $SEED > /dev/null 2>&1
 }
 
 run_simulation_all() {
@@ -34,9 +34,14 @@ run_simulation_all() {
     done
 }
 
-run_main_ablation() {
-    MIN_INTERVAL=$1
-    UNIT_INTERVAL=$2
+run_ablation() {
+    TARGET=$1
+    MIN_INTERVAL=$2
+    UNIT_INTERVAL=$3
+
+    cd abyss_test
+    ./pkg_load.sh $TARGET
+    cd ..
     
     cd abyss_test
     sed -i "s/\(TimerMinInterval  = \)300/\1${MIN_INTERVAL}/" ./abyss_core/and/utils.go
@@ -44,17 +49,9 @@ run_main_ablation() {
     go build -o scenario_run .
     cd ..
 
-    sudo rm -rf ./results
-
-    run_stability_seed_range $N_PEERS 30 0 4
-    mkdir ablation/t_min_${MIN_INTERVAL}_unit_${UNIT_INTERVAL}
-    cp results/${N_PEERS}/ -r ablation/t_min_${MIN_INTERVAL}_unit_${UNIT_INTERVAL}/
-    
-    cd abyss_test
-    sed -i "s/\(TimerMinInterval  = \)${MIN_INTERVAL}/\1300/" ./abyss_core/and/utils.go
-    sed -i "s/\(TimerUnitInterval = \)${UNIT_INTERVAL}/\1300/" ./abyss_core/and/utils.go
-    go build -o scenario_run .
-    cd ..
+    run_simulation_all
+    mkdir -p ablation/${TARGET}/t_min_${MIN_INTERVAL}_unit_${UNIT_INTERVAL}/
+    cp results/${N_PEERS}/ -r ablation/${TARGET}/t_min_${MIN_INTERVAL}_unit_${UNIT_INTERVAL}/
 }
 
 run_main() {
@@ -62,7 +59,7 @@ run_main() {
     ./pkg_load.sh dev
     cd ..
 
-    run_simulation_all()
+    run_simulation_all
     mkdir -p burst/dev/
     cp results/${N_PEERS}/ -r burst/dev/
 }
@@ -72,9 +69,29 @@ run_naive() {
     ./pkg_load.sh dev-eval-naive
     cd ..
 
-    run_simulation_all()
+    run_simulation_all
     mkdir -p burst/dev-eval-naive/
     cp results/${N_PEERS}/ -r burst/dev-eval-naive/
 }
 
-run_main()
+run_trickle() {
+    cd abyss_test
+    ./pkg_load.sh dev-eval-trickle
+    cd ..
+
+    run_simulation_all
+    mkdir -p burst/dev-eval-trickle/
+    cp results/${N_PEERS}/ -r burst/dev-eval-trickle/
+}
+
+# run_trickle
+
+run_ablation dev-v2 0 300
+run_ablation dev-v2 200 300
+run_ablation dev-v2 400 300
+run_ablation dev-v2 600 300
+
+run_ablation dev-v2 300 100
+run_ablation dev-v2 300 300
+run_ablation dev-v2 300 500
+run_ablation dev-v2 300 700

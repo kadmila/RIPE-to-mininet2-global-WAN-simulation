@@ -493,10 +493,10 @@ def run_peer_applications(net, topo) -> int:
     for peer, peer_name in peers:
         peer.cmd(f'ifstat -i h_eth1 -n 0.1 > {results_path}/ifstat_{peer_name}.log &')
         
-    time_start = int(time.time()) + 10
+    time_start_ms = int(time.time() * 1000) + 10_000
     print("Starting application...")
     for peer, peer_name in peers:
-        peer.cmd(f'./abyss_test/scenario_run --id={peer_name} --contact_dir={contact_dir} --t_start={time_start} --duration={scenario_duration} --scenario={scenario_dir}/{peer_name} --out {results_path}/evnt_{peer_name}.log  &> {results_path}/out_{peer_name}.log &')
+        peer.cmd(f'./abyss_test/scenario_run --id={peer_name} --contact_dir={contact_dir} --t_start={time_start_ms} --duration={scenario_duration} --scenario={scenario_dir}/{peer_name} --out {results_path}/evnt_{peer_name}.log  &> {results_path}/out_{peer_name}.log &')
     
     return scenario_duration
 
