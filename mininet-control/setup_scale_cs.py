@@ -35,14 +35,8 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '--n_peers',
     type=int,
-    default=100,
-    help='Number of peers to generate (default: 100)'
-)
-parser.add_argument(
-    '--n_churn',
-    type=int,
-    default=10,
-    help='Number of peers to churn (default: 10)'
+    default=0,
+    help='Number of peers to generate (default: 0)'
 )
 parser.add_argument(
     '--seed',
@@ -404,14 +398,14 @@ def gen_scenario_scale(net, topo) -> int:
         'do': 'open',
     })
 
-    # initial 10: prepare for dial
-    for i in range(2, 101):
+    # prepare for dial
+    for i in range(2, 11):
         scenario_data['h1'].append({
             'time': f'{time_now}',
             'do': 'add',
             'id': f'h{i}',
         })
-    for i in range(2, 101):
+    for i in range(2, 11):
         scenario_data[f'h{i}'].append({
             'time': f'{time_now}',
             'do': 'add',
@@ -420,7 +414,7 @@ def gen_scenario_scale(net, topo) -> int:
 
     # initial 10: join to first one.
     time_now += 1
-    for i in range(2, 101):
+    for i in range(2, 11):
         scenario_data[f'h{i}'].append({
             'time': f'{time_now}',
             'do': 'dial',
@@ -428,29 +422,20 @@ def gen_scenario_scale(net, topo) -> int:
         })
 
     time_now += 1
-    for i in range(2, 101):
+    for i in range(2, 11):
         scenario_data[f'h{i}'].append({
             'time': f'{time_now}',
             'do': 'join',
             'id': 'h1',
         })
-
-    peers_in_world = set()
-    for i in range(1, 101):
-        peers_in_world.add(f'h{i}')
-
-    time_now += 60
     
-    # followings: join to peers in the world, leave.
-    for cycle in range((args.n_peers - 100) // args.n_churn):
+    # followings: join to the first peer. (h11 ~ )
+    for cycle in range(1, args.n_peers // 10):
         time_now += 8 # 10 second gap for stabilization
 
-        # (joiner id, target id)[args.n_churn]
-        leave_targets_ids = random.sample(sorted(peers_in_world), args.n_churn)
-        for leave_target_id in leave_targets_ids:
-            peers_in_world.remove(leave_target_id)
+        # (joiner id, target id)[10]
+        join_targets_ids = [(f'h{10 * cycle + i}', f'h1') for i in range(1, 11)]
 
-        join_targets_ids = [(f'h{100 + args.n_churn * cycle + i}', f'{random.sample(sorted(peers_in_world), 1)[0]}') for i in range(1, args.n_churn +1)]
         for joiner_id, target_id in join_targets_ids:
             scenario_data[target_id].append({
                 'time': f'{time_now}',
@@ -485,16 +470,6 @@ def gen_scenario_scale(net, topo) -> int:
                 'do': 'join',
                 'id': target_id,
             })
-
-        for leave_target_id in leave_targets_ids:
-            scenario_data[leave_target_id].append({
-                'time': f'{time_now}',
-                'do': 'close',
-                'id': leave_target_id
-            })
-            
-        for joiner_id, _ in join_targets_ids:
-            peers_in_world.add(joiner_id)
     
     for peer_name in peer_names:
         file_path = os.path.join(scenario_dir, peer_name)
@@ -502,7 +477,7 @@ def gen_scenario_scale(net, topo) -> int:
         with open(file_path, 'w') as f:
             json.dump(scenario_data[peer_name], f)
 
-    time_now += 30
+    time_now += 10
     return time_now
 
 def run_peer_applications(net, topo) -> int:

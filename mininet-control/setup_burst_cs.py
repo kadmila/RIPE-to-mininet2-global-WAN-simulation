@@ -436,7 +436,7 @@ def gen_scenario_scale(net, topo) -> int:
         })
 
     peers_in_world = set()
-    for i in range(1, 101):
+    for i in range(2, 101):
         peers_in_world.add(f'h{i}')
 
     time_now += 60
@@ -450,7 +450,7 @@ def gen_scenario_scale(net, topo) -> int:
         for leave_target_id in leave_targets_ids:
             peers_in_world.remove(leave_target_id)
 
-        join_targets_ids = [(f'h{100 + args.n_churn * cycle + i}', f'{random.sample(sorted(peers_in_world), 1)[0]}') for i in range(1, args.n_churn +1)]
+        join_targets_ids = [(f'h{100 + args.n_churn * cycle + i}', f'h1') for i in range(1, args.n_churn +1)]
         for joiner_id, target_id in join_targets_ids:
             scenario_data[target_id].append({
                 'time': f'{time_now}',

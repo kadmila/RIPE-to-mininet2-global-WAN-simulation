@@ -2,17 +2,12 @@
 tmp
 results
 plotter/*.jpg
-processed_data
 
 # data
 ablation
-plots
-old_data
 burst
+continuous
 scale
 
 # misc
-dump.log
 abyss_test/abyss_core
-
-

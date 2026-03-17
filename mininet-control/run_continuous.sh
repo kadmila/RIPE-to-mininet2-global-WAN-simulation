@@ -1,15 +1,13 @@
 # constants
-N_PEERS=300
+N_PEERS=200
+N_CHURN=10
 SEED_MIN=0
 SEED_MAX=4
-
-# initialization
-sudo rm -rf ./results
 
 run_simulation_one_seed() {
     SEED=$1
 
-    echo "Running scale: N_PEERS $N_PEERS seed $i"
+    echo "Running continuous churn: N_PEERS $N_PEERS N_CHURN $N_CHURN seed $i"
 
     sudo mn -c > /dev/null 2>&1
     ulimit -n 65535 > /dev/null 2>&1
@@ -24,7 +22,7 @@ run_simulation_one_seed() {
     sudo rm -rf ./results/$N_PEERS/$SEED
     mkdir -p ./results/$N_PEERS/$SEED
     
-    sudo python3 setup_scale.py --n_peers $N_PEERS --seed $SEED > /dev/null 2>&1
+    sudo python3 setup_burst.py --n_peers $N_PEERS --n_churn $N_CHURN --seed $SEED > /dev/null 2>&1
 }
 
 run_simulation_all() {
@@ -39,18 +37,18 @@ run_pkg() {
     cd abyss_test
     ./pkg_load.sh ${PKG}
     cd ..
-    
+
     sudo rm -rf ./results
     run_simulation_all
-    rm -rf scale/${PKG}/${N_PEERS}/
-    mkdir -p scale/${PKG}/
-    cp results/${N_PEERS}/ -r scale/${PKG}/
+    rm -rf continuous/${PKG}/${N_PEERS}/
+    mkdir -p continuous/${PKG}/
+    cp results/${N_PEERS}/ -r continuous/${PKG}/
 }
 
 run_simulation_one_seed_cs() {
     SEED=$1
 
-    echo "Running scale: N_PEERS $N_PEERS seed $i"
+    echo "Running continuous churn: N_PEERS $N_PEERS N_CHURN $N_CHURN seed $i"
 
     sudo mn -c > /dev/null 2>&1
     ulimit -n 65535 > /dev/null 2>&1
@@ -65,7 +63,7 @@ run_simulation_one_seed_cs() {
     sudo rm -rf ./results/$N_PEERS/$SEED
     mkdir -p ./results/$N_PEERS/$SEED
     
-    sudo python3 setup_scale_cs.py --n_peers $N_PEERS --seed $SEED > /dev/null 2>&1
+    sudo python3 setup_burst_cs.py --n_peers $N_PEERS --n_churn $N_CHURN --seed $SEED > /dev/null 2>&1
 }
 
 run_simulation_all_cs() {
@@ -78,15 +76,28 @@ run_cs() {
     cd abyss_test
     ./pkg_load.sh dev-eval-naive
     cd ..
-    
+
     sudo rm -rf ./results
     run_simulation_all_cs
-    rm -rf scale/client-server/${N_PEERS}/
-    mkdir -p scale/client-server/
-    cp results/${N_PEERS}/ -r scale/client-server/
+    rm -rf continuous/client-server/${N_PEERS}/
+    mkdir -p continuous/client-server/
+    cp results/${N_PEERS}/ -r continuous/client-server/
 }
 
-# run_pkg dev-v2
-# run_pkg dev-eval-naive
-# run_pkg dev-eval-trickle
+N_PEERS=200
+N_CHURN=10
+run_pkg dev-v2
+run_pkg dev-eval-trickle
 run_cs
+
+N_PEERS=130
+N_CHURN=3
+run_pkg dev-v2
+run_pkg dev-eval-trickle
+run_cs
+
+# N_PEERS=110
+# N_CHURN=1
+# run_pkg dev-v2
+# run_pkg dev-eval-trickle
+# run_cs
