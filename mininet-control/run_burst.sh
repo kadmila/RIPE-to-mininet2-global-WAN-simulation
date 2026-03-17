@@ -1,8 +1,8 @@
 # constants
 N_PEERS=130
 N_CHURN=30
-SEED_MIN=0
-SEED_MAX=4
+SEED_MIN=5
+SEED_MAX=9
 
 run_simulation_one_seed() {
     SEED=$1
@@ -48,6 +48,7 @@ run_ablation() {
 
     sudo rm -rf ./results
     run_simulation_all
+    #rm -rf ablation/${TARGET}/t_min_${MIN_INTERVAL}_unit_${UNIT_INTERVAL}/${N_PEERS}/
     mkdir -p ablation/${TARGET}/t_min_${MIN_INTERVAL}_unit_${UNIT_INTERVAL}/
     cp results/${N_PEERS}/ -r ablation/${TARGET}/t_min_${MIN_INTERVAL}_unit_${UNIT_INTERVAL}/
 }
@@ -105,30 +106,28 @@ run_cs() {
     cp results/${N_PEERS}/ -r burst/client-server/
 }
 
-# run_ablation dev-v2 0 300
-# run_ablation dev-v2 200 300
-# run_ablation dev-v2 400 300
-# run_ablation dev-v2 600 300
+run_ablation dev-v2 0 300
+run_ablation dev-v2 200 300
+run_ablation dev-v2 400 300
+run_ablation dev-v2 600 300
 
-# run_ablation dev-v2 300 100
-# run_ablation dev-v2 300 300
-# run_ablation dev-v2 300 500
-# run_ablation dev-v2 300 700
+run_ablation dev-v2 300 100
+run_ablation dev-v2 300 300
+run_ablation dev-v2 300 500
+run_ablation dev-v2 300 700
 
 
+# N_PEERS=130
+# N_CHURN=30
+# run_pkg dev-v2
+# run_pkg dev-eval-trickle
 # run_cs
 
-N_PEERS=130
-N_CHURN=30
-run_pkg dev-v2
-run_pkg dev-eval-trickle
-run_cs
-
-N_PEERS=160
-N_CHURN=60
-run_pkg dev-v2
-run_pkg dev-eval-trickle
-run_cs
+# N_PEERS=160
+# N_CHURN=60
+# run_pkg dev-v2
+# run_pkg dev-eval-trickle
+# run_cs
 
 # N_PEERS=190
 # N_CHURN=90
