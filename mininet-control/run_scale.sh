@@ -1,7 +1,7 @@
 # constants
 N_PEERS=300
-SEED_MIN=0
-SEED_MAX=4
+SEED_MIN=5
+SEED_MAX=20
 
 # initialization
 sudo rm -rf ./results
@@ -42,7 +42,6 @@ run_pkg() {
     
     sudo rm -rf ./results
     run_simulation_all
-    rm -rf scale/${PKG}/${N_PEERS}/
     mkdir -p scale/${PKG}/
     cp results/${N_PEERS}/ -r scale/${PKG}/
 }
@@ -81,12 +80,11 @@ run_cs() {
     
     sudo rm -rf ./results
     run_simulation_all_cs
-    rm -rf scale/client-server/${N_PEERS}/
     mkdir -p scale/client-server/
     cp results/${N_PEERS}/ -r scale/client-server/
 }
 
-# run_pkg dev-v2
+run_pkg dev-v2
 # run_pkg dev-eval-naive
-# run_pkg dev-eval-trickle
+run_pkg dev-eval-trickle
 run_cs
